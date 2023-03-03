@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 
    //get the filesize
    FILE *file = fopen(filename, "r");
-   if (file = NULL) {
+   if (file == NULL) {
       printf("could not open file\n");
       exit(errno);
    }
@@ -49,30 +49,35 @@ int main(int argc, char **argv)
          printf("Only one byte left at the end of the file, stopping early");
          break;
       }
+      //decode the 16 bit instruction
       u8 firstbyte = content[i];
       u8 secondbyte = content[i+1];
       
-      u8 opcode = (firstbyte & 0xFC);
+      u8 opcode = (firstbyte & 0xFC) >> 2;
+      u8 dw = (firstbyte & 0x3);
 
-      if(opcode == 0x88) { // MOV
+      u8 mod = (secondbyte & 0xC0) >> 6;
+      u8 reg = (secondbyte & 0x38) >> 3;
+      u8 rm = secondbyte & 0x7;
+
+      u8 dst = rm;
+      u8 src = reg;
+
+      if (dw & 0x2) { //if the D bit is set swap dst and src;
+         dst = reg;
+         src = rm;
+      }
+
+      char** regnames = byteregisters;
+      if (dw & 0x1) { //if the W bit is set use the word size registers
+         regnames = wordregisters;
+      } 
+
+      //opcodes
+      if (opcode == 0x22) { // MOV 1000 10
          printf("mov ");
-         u8 type = (firstbyte & 0x3);
-
-         if (type == 0x01) { //word size
-            u8 reg1 = secondbyte & 0x7;
-            u8 reg2 = (secondbyte & 0x38) >> 3;
-            printf("%s, %s", wordregisters[reg1], wordregisters[reg2]);
-            printf(" ; %x\n", secondbyte & 0xff);
-
-         } else if (type == 0) { //byte size
-            u8 reg1 = secondbyte & 0x7;
-            u8 reg2 = (secondbyte & 0x38) >> 3;
-            printf("%s, %s", byteregisters[reg1], byteregisters[reg2]);
-            printf(" ; %x\n", secondbyte & 0xff);
-
-         } else {
-            printf("; UNKNOWN MOV TYPE %x\n", type);
-         }
+         printf("%s, %s", regnames[dst], regnames[src]);
+         printf(" ; %x\n", secondbyte & 0xff);
 
       } else {
          printf("; UNKNOWN OPCODE %x\n", opcode);
