@@ -40,15 +40,15 @@ int main(int argc, char **argv)
    u8* content = (u8*)malloc(filesize*sizeof(u8*));
 
    fread(content, filesize, 1, file);
-   if (filesize < 2) {
-      printf("file should be at least 2 bytes");
-      exit(1);
-   }
 
    //asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
    //start the asm output
    for(int i = 0; i < filesize; i = i + 2){
+      if (i+1 >= filesize) {
+         printf("Only one byte left at the end of the file, stopping early");
+         break;
+      }
       u8 first = content[i];
       u8 second = content[i+1];
       if((first & 0xFC) == 0x88) { // MOV

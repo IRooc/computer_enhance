@@ -1,1 +1,1 @@
-cl disasm8086.c
+cl /Od disasm8086.c /link /DEBUG
