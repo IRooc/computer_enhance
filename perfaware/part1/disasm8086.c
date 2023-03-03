@@ -21,7 +21,7 @@ int main(int argc, char **argv)
       printf("could not open file\n");
       exit(errno);
    }
-   if (fseek(file, 0, SEEK_END) < 0){
+   if (fseek(file, 0, SEEK_END) < 0) {
       printf("could not seek to end of file\n");
       exit(errno);
    }
@@ -43,36 +43,39 @@ int main(int argc, char **argv)
 
    //asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
-   //start the asm output
-   for(int i = 0; i < filesize; i = i + 2){
+   //start the asm output, assume 16 bits so 2 byte jumps
+   for(int i = 0; i < filesize; i = i + 2) {
       if (i+1 >= filesize) {
          printf("Only one byte left at the end of the file, stopping early");
          break;
       }
-      u8 first = content[i];
-      u8 second = content[i+1];
-      if((first & 0xFC) == 0x88) { // MOV
+      u8 firstbyte = content[i];
+      u8 secondbyte = content[i+1];
+      
+      u8 opcode = (firstbyte & 0xFC);
+
+      if(opcode == 0x88) { // MOV
          printf("mov ");
-         u8 type = (first & 0x3);
+         u8 type = (firstbyte & 0x3);
 
          if (type == 0x01) { //word size
-            u8 reg1 = second & 0x7;
-            u8 reg2 = (second & 0x38) >> 3;
+            u8 reg1 = secondbyte & 0x7;
+            u8 reg2 = (secondbyte & 0x38) >> 3;
             printf("%s, %s", wordregisters[reg1], wordregisters[reg2]);
-            printf(" ; %x\n", second & 0xff);
+            printf(" ; %x\n", secondbyte & 0xff);
 
          } else if (type == 0) { //byte size
-            u8 reg1 = second & 0x7;
-            u8 reg2 = (second & 0x38) >> 3;
+            u8 reg1 = secondbyte & 0x7;
+            u8 reg2 = (secondbyte & 0x38) >> 3;
             printf("%s, %s", byteregisters[reg1], byteregisters[reg2]);
-            printf(" ; %x\n", second & 0xff);
+            printf(" ; %x\n", secondbyte & 0xff);
 
          } else {
             printf("; UNKNOWN MOV TYPE %x\n", type);
          }
 
       } else {
-         printf("; UNKNOWN OPCODE %x\n", first & 0xFC);
+         printf("; UNKNOWN OPCODE %x\n", opcode);
       }
    }
    free(content);
