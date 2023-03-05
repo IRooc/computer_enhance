@@ -7,7 +7,7 @@ typedef uint8_t u8;
 static char* byteregisters[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
 static char* wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
 
-int main(int argc, char **argv)
+int main(int argc, char **argv)  
 {
    if (argc != 2) {
       printf("Usage: desasm8086.exe <binary-fileinput> ");
@@ -43,44 +43,54 @@ int main(int argc, char **argv)
 
    //asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
+
    //start the asm output, assume 16 bits so 2 byte jumps
-   for(int i = 0; i < filesize; i = i + 2) {
+   int i = 0;
+   while(i < filesize) {
       if (i+1 >= filesize) {
          printf("Only one byte left at the end of the file, stopping early");
          break;
       }
       //decode the 16 bit instruction
       u8 firstbyte = content[i];
-      u8 secondbyte = content[i+1];
+      i += 1; //consumed a byte
       
-      u8 opcode = (firstbyte & 0xFC) >> 2;
+      u8 firsta = (firstbyte & 0xF0) >> 4;
+      u8 firstb = (firstbyte & 0xF); 
+
       u8 dw = (firstbyte & 0x3);
 
-      u8 mod = (secondbyte & 0xC0) >> 6;
-      u8 reg = (secondbyte & 0x38) >> 3;
-      u8 rm = secondbyte & 0x7;
-
-      u8 dst = rm;
-      u8 src = reg;
-
-      if (dw & 0x2) { //if the D bit is set swap dst and src;
-         dst = reg;
-         src = rm;
-      }
-
-      char** regnames = byteregisters;
-      if (dw & 0x1) { //if the W bit is set use the word size registers
-         regnames = wordregisters;
-      } 
 
       //opcodes
-      if (opcode == 0x22) { // MOV 1000 10
-         printf("mov ");
-         printf("%s, %s", regnames[dst], regnames[src]);
-         printf(" ; %x\n", secondbyte & 0xff);
+      if ((firsta == 0x8) && ((firstb & 0xC) == 0x8)) { // MOV 1000 10xx  reg/mem to/from reg
+         u8 secondbyte = content[i];
+         i += 1;//consumed a byte
+         u8 mod = (secondbyte & 0xC0) >> 6;
+         u8 reg = (secondbyte & 0x38) >> 3;
+         u8 rm = secondbyte & 0x7;
+
+         u8 dst = rm;
+         u8 src = reg;
+
+         if (dw & 0x2) { //if the D bit is set swap dst and src;
+            dst = reg;
+            src = rm;
+         }
+
+         char** regnames = byteregisters;
+         if (dw & 0x1) { //if the W bit is set use the word size registers
+            regnames = wordregisters;
+         } 
+
+         if (mod == 0x3) {
+            printf("mov ");
+            printf("%s, %s", regnames[dst], regnames[src]);
+            printf(" ; %x\n", secondbyte & 0xff);
+         } 
 
       } else {
-         printf("; UNKNOWN OPCODE %x\n", opcode);
+         printf("; UNKNOWN OPCODE %x %x\n", firsta, firstb);
+         i += 1; //just skip to next byt
       }
    }
    free(content);
