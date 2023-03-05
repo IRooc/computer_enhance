@@ -7,6 +7,8 @@ typedef uint8_t u8;
 static char* byteregisters[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
 static char* wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
 
+static char* rmtable[] = {"bx + si", "bx + di", "bp + si", "bp + di", "si", "di", "bp", "bx"};
+
 int main(int argc, char **argv)  
 {
    if (argc != 2) {
@@ -86,8 +88,42 @@ int main(int argc, char **argv)
             printf("mov ");
             printf("%s, %s", regnames[dst], regnames[src]);
             printf(" ; %x\n", secondbyte & 0xff);
+         } else {
+            char* memaddr = rmtable[rm];
+            char displacement[32] = "";
+            if (mod == 1) {
+               u8 lowaddr = content[i];
+               i += 1;//consumed a byte
+               if (lowaddr)
+                  snprintf(displacement, 32, " + %d", lowaddr);
+            } else if (mod == 2) {
+               u8 lowaddr = content[i];
+               i += 1;//consumed a byte
+               u8 highaddr = content[i];
+               i += 1;//consumed a byte
+               int disp = ((highaddr<<8) + lowaddr);
+               if (disp)
+                  snprintf(displacement, 32, " + %d", disp);
+            }
+            
+            if (dw & 0x2) {
+               printf("mov %s, [%s%s]; rm = %x\n", regnames[reg], memaddr, displacement, rm);
+            } else {
+               printf("mov [%s%s], %s; rm = %x\n", memaddr, displacement, regnames[reg], rm);
+            }
          } 
-
+      } else if (firsta == 0xB) {
+         u8 reg2 = firstb & 7;
+         int datalow = content[i];
+         char** regnames = byteregisters;
+         i += 1; //consumed a byte
+         if ((firstb & 8) == 8) {
+            u8 datahigh = content[i];
+            i += 1; //consumed a byte
+            datalow += (datahigh<<8);
+            regnames = wordregisters;
+         }
+         printf("mov %s, %d\n", regnames[reg2], datalow);
       } else {
          printf("; UNKNOWN OPCODE %x %x\n", firsta, firstb);
          i += 1; //just skip to next byt
