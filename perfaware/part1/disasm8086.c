@@ -85,8 +85,7 @@ int main(int argc, char **argv)
          } 
 
          if (mod == 0b11) { //register to register
-            printf("mov ");
-            printf("%s, %s\n", regnames[dst], regnames[src]);
+            printf("mov %s, %s\n", regnames[dst], regnames[src]);
          } else { //mem to reg or reg to mem
             char* memaddr = rmtable[rm];
             char displacement[32] = "";
