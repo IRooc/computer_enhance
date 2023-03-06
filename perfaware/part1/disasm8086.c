@@ -41,7 +41,12 @@ int main(int argc, char **argv)
    //read the whole file
    u8* content = (u8*)malloc(filesize*sizeof(u8*));
 
-   fread(content, filesize, 1, file);
+   long readsize = fread(content, filesize, 1, file);
+   if (readsize != filesize) {
+      printf("could not read the full file");
+      exit(1);
+   }
+   fclose(file);
 
    //asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
