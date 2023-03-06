@@ -70,12 +70,12 @@ int main(int argc, char **argv)
       u8 firstbyte = content[i];
       i += 1; // consumed a byte
 
-      u8 dw = (firstbyte & 0x3);
-      u8 iswide = (dw & 0b01); //wide?
+      u8 iswide = (firstbyte & 0b01); //wide?
 
       // opcodes
       if ((firstbyte & 0b11111100) == 0b10001000)
       { // MOV 1000 10xx  reg/mem to/from reg
+         u8 dw = (firstbyte & 0x3);
          u8 secondbyte = content[i];
          i += 1; // consumed a byte
          u8 mod = (secondbyte & 0xC0) >> 6;
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
          { // register to register
             u8 dst = rm;
             u8 src = reg;
-            if (dw & 0x2)
+            if (dw & 0b10)
             { // if the D bit is set swap dst and src;
                dst = reg;
                src = rm;
@@ -171,8 +171,10 @@ int main(int argc, char **argv)
             i += 1; // consumed a byte
             datalow += (datahigh << 8);
             regnames = wordregisters;
+            printf("mov %s, %d\n", regnames[reg2], (signed short)datalow);
+         } else {            
+            printf("mov %s, %d\n", regnames[reg2], (signed char)datalow);
          }
-         printf("mov %s, %d\n", regnames[reg2], (signed short)datalow);
       }
       else if ((firstbyte & 0b11111110) == 0b11000110)
       { // 1100 011 immediate to reg/mem
