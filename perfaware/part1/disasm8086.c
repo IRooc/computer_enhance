@@ -120,12 +120,12 @@ int main(int argc, char **argv)
             
             if (dw & 0b10) {
                if (rm == 0b110 && mod == 0) { //direct address so not based of memaddr
-                  printf("mov %s, [%d]; rm = %x mod = %x\n", regnames[reg], disp, rm, mod);
+                  printf("mov %s, [%d]\n", regnames[reg], disp);
                } else {
-                  printf("mov %s, [%s%s]; rm = %x mod = %x\n", regnames[reg], memaddr, displacement, rm, mod);
+                  printf("mov %s, [%s%s]\n", regnames[reg], memaddr, displacement);
                }
             } else {
-               printf("mov [%s%s], %s; rm = %x mod = %x\n", memaddr, displacement, regnames[reg], rm, mod);
+               printf("mov [%s%s], %s\n", memaddr, displacement, regnames[reg]);
             }
          } 
       } else if (firsta == 0b1011) { //1011 immediate to register
@@ -175,9 +175,9 @@ int main(int argc, char **argv)
                i += 1;//consumed a byte
                data += (data2<<8);
             }
-            printf("mov [%s%s], %s %d; wide = %x rm = %x mod = %x\n", memaddr, displacement, sizeprefix, data, iswide, rm, mod);
+            printf("mov [%s%s], %s %d\n", memaddr, displacement, sizeprefix, data);
          } else { //immediate to registry
-            printf("mov [%s], %s %d; wide = %x rm = %x mod = %x\n", memaddr, sizeprefix, disp, iswide, rm, mod);
+            printf("mov [%s], %s %d\n", memaddr, sizeprefix, disp);
          }
       } else if (firsta == 0b1010 && (firstb & 0b1110) == 0) { //mem to accum
          int memaddr = content[i];
