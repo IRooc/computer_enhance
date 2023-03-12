@@ -224,7 +224,7 @@ int main(int argc, char **argv)
          }
          short disp = (signed short)((disphigh << 8) + displow);
 
-         if (disp && mod) // white displacement suffix
+         if (disp && mod) // write displacement suffix
          {
             if (disp < 0)
             {
@@ -253,12 +253,12 @@ int main(int argc, char **argv)
                   i += 1; // consumed a byte
                   data += (data2 << 8);
                }
-               printf("%s [%s%s], %s %d\n", operation, memaddr, displacement, sizeprefix, data);
+               printf("%s [%s%s], %s %d ;%x %x\n", operation, memaddr, displacement, sizeprefix, data, firstbyte, secondbyte);
             }
          }
          else
          { // immediate to registry
-            printf("%s [%s], %s %d\n", operation, memaddr, sizeprefix, disp);
+            printf("%s [%s], %s %d ;%x %x\n", operation, memaddr, sizeprefix, disp, firstbyte, secondbyte);
          }
       }
       else if ((firstbyte & 0b11111110) == 0b10100000) // mem to accum
