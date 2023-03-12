@@ -70,11 +70,17 @@ int main(int argc, char **argv)
       u8 firstbyte = content[i];
       i += 1; // consumed a byte
 
-      u8 iswide = (firstbyte & 0b01); //wide?
+      u8 iswide = (firstbyte & 0b01); // wide?
 
       // opcodes
-      if ((firstbyte & 0b11111100) == 0b10001000) // MOV 1000 10xx  reg/mem to/from reg
+      if (((firstbyte & 0b11111100) == 0b10001000) // MOV 1000 10xx  reg/mem to/from reg
+          || ((firstbyte & 0b11111100) == 0))      // ADD 0000 00xx
       {
+         u8 *operation = "mov";
+         if ((firstbyte & 0b11111100) == 0)
+         {
+            operation = "add";
+         }
          u8 dw = (firstbyte & 0x3);
          u8 secondbyte = content[i];
          i += 1; // consumed a byte
@@ -97,14 +103,14 @@ int main(int argc, char **argv)
                dst = reg;
                src = rm;
             }
-            printf("mov %s, %s\n", regnames[dst], regnames[src]);
+            printf("%s %s, %s\n", operation, regnames[dst], regnames[src]);
          }
          else
          { // mem to reg or reg to mem
             char *memaddr = rmtable[rm];
             char displacement[32] = "";
             signed short disp = 0;
-            if (mod == 1) //8 bit displacement
+            if (mod == 1) // 8 bit displacement
             {
                u8 displow = content[i];
                i += 1; // consumed a byte
@@ -121,7 +127,7 @@ int main(int argc, char **argv)
                   }
                }
             }
-            else if (mod == 0b10 || (mod == 0 && rm == 0b110)) //16 bit displacement 
+            else if (mod == 0b10 || (mod == 0 && rm == 0b110)) // 16 bit displacement
             {
                u8 displow = content[i];
                i += 1; // consumed a byte
@@ -142,20 +148,20 @@ int main(int argc, char **argv)
                }
             }
 
-            if (dw & 0b10) //is the destination a registry
+            if (dw & 0b10) // is the destination a registry
             {
                if (rm == 0b110 && mod == 0) // direct address so not based of memaddr
                {
-                  printf("mov %s, [%d]\n", regnames[reg], disp);
+                  printf("%s %s, [%d]\n", operation, regnames[reg], disp);
                }
                else
                {
-                  printf("mov %s, [%s%s]\n", regnames[reg], memaddr, displacement);
+                  printf("%s %s, [%s%s]\n", operation, regnames[reg], memaddr, displacement);
                }
             }
             else
             {
-               printf("mov [%s%s], %s\n", memaddr, displacement, regnames[reg]);
+               printf("%s [%s%s], %s\n", operation, memaddr, displacement, regnames[reg]);
             }
          }
       }
@@ -164,24 +170,46 @@ int main(int argc, char **argv)
          u8 reg2 = firstbyte & 7;
          char **regnames = byteregisters;
          short datalow = content[i];
-         i += 1; // consumed a byte
-         if ((firstbyte & 0b1000) == 0b1000) //wide bit set?
+         i += 1;                             // consumed a byte
+         if ((firstbyte & 0b1000) == 0b1000) // wide bit set?
          {
             regnames = wordregisters;
             u8 datahigh = content[i];
             i += 1; // consumed a byte
             datalow += (datahigh << 8);
             printf("mov %s, %d\n", regnames[reg2], (signed short)datalow);
-         } else {            
+         }
+         else
+         {
             printf("mov %s, %d\n", regnames[reg2], (signed char)datalow);
          }
       }
-      else if ((firstbyte & 0b11111110) == 0b11000110) // 1100 011 immediate to reg/mem
+      else if (((firstbyte & 0b11111110) == 0b11000110) // 1100 011 immediate to reg/mem
+               || ((firstbyte & 0b11111100) == 0b10000000))
       {
+         u8 *operation = "mov";
+         char **regnames = byteregisters;
+         if ((firstbyte & 0b11111100) == 0b10000000)
+         {
+            operation = "add";
+            // check wide for add option
+            if (firstbyte & 0b11 == 0b01)
+            {
+               iswide = 1;
+            }
+            else
+            {
+               iswide = 0;
+            }
+            if (firstbyte & 0b1) {
+               regnames = wordregisters;
+            }
+         }
          u8 secondbyte = content[i];
          i += 1; // consumed a byte
          u8 mod = (secondbyte & 0xC0) >> 6;
          u8 rm = secondbyte & 0x7;
+
          char *memaddr = rmtable[rm];
          char displacement[32] = "";
          u8 displow = content[i];
@@ -196,7 +224,7 @@ int main(int argc, char **argv)
          }
          short disp = (signed short)((disphigh << 8) + displow);
 
-         if (disp && mod) //white displacement suffix
+         if (disp && mod) // white displacement suffix
          {
             if (disp < 0)
             {
@@ -210,19 +238,27 @@ int main(int argc, char **argv)
          }
          if (mod)
          { // immediate to memory read the data bytes
-            short data = content[i];
-            i += 1; // consumed a byte
-            if (iswide) //wide?
+            if (mod & 0b11 == 0b11 && operation != "mov")
             {
-               short data2 = content[i];
-               i += 1; // consumed a byte
-               data += (data2 << 8);
+               memaddr = regnames[rm];
+               printf("%s %s, %d\n", operation, memaddr, disp);
             }
-            printf("mov [%s%s], %s %d\n", memaddr, displacement, sizeprefix, data);
+            else
+            {
+               short data = content[i];
+               i += 1;     // consumed a byte
+               if (iswide) // wide?
+               {
+                  short data2 = content[i];
+                  i += 1; // consumed a byte
+                  data += (data2 << 8);
+               }
+               printf("%s [%s%s], %s %d\n", operation, memaddr, displacement, sizeprefix, data);
+            }
          }
          else
          { // immediate to registry
-            printf("mov [%s], %s %d\n", memaddr, sizeprefix, disp);
+            printf("%s [%s], %s %d\n", operation, memaddr, sizeprefix, disp);
          }
       }
       else if ((firstbyte & 0b11111110) == 0b10100000) // mem to accum
