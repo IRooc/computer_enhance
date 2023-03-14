@@ -9,6 +9,8 @@ static char *wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
 
 static char *rmtable[] = {"bx + si", "bx + di", "bp + si", "bp + di", "si", "di", "bp", "bx"};
 
+static char *arithmatic_opperations[8] = {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
+
 int main(int argc, char **argv)
 {
    if (argc != 2)
@@ -80,17 +82,11 @@ int main(int argc, char **argv)
           || ((firstbyte & 0b11111100) == 0))         // ADD 0000 00xx
       {
          u8 *operation = "mov";
-         if ((firstbyte & 0b11111100) == 0)
+
+         if ((firstbyte & 0b10000000) == 0) // if first bit is not set its not a mov
          {
-            operation = "add";
-         }
-         else if ((firstbyte & 0b11111100) == 0b00101000)
-         {
-            operation = "sub";
-         }
-         else if ((firstbyte & 0b11111100) == 0b00111000)
-         {
-            operation = "cmp";
+            u8 opp = (firstbyte & 0b00111000) >> 3;
+            operation = arithmatic_opperations[opp];
          }
          u8 secondbyte = content[i];
          i += 1; // consumed a byte
@@ -209,7 +205,7 @@ int main(int argc, char **argv)
             u8 displow = content[i];
             i += 1; // consumed a byte
             u8 disphigh = 0;
-            if (iswide)
+            if (mod == 0b10)
             { // if wide bit is set consume another byte
                disphigh = content[i];
                i += 1; // consumed a byte
@@ -254,7 +250,11 @@ int main(int argc, char **argv)
          u8 secondbyte = content[i];
          i += 1; // consumed a byte
          u8 mod = (secondbyte & 0xC0) >> 6;
-         char *operation = "add";
+         u8 rm = secondbyte & 0x7;
+
+         u8 opp = (secondbyte & 0b00111000) >> 3;
+         char *operation = arithmatic_opperations[opp];
+
          u8 oper = (secondbyte & 0b00111000) >> 3;
          if (oper == 0b101)
          {
@@ -264,7 +264,6 @@ int main(int argc, char **argv)
          {
             operation = "cmp";
          }
-         u8 rm = secondbyte & 0x7;
          char *memaddr = rmtable[rm];
          char displacement[32] = "";
          signed short disp = 0;
@@ -279,14 +278,14 @@ int main(int argc, char **argv)
             u8 displow = content[i];
             i += 1; // consumed a byte
             u8 disphigh = 0;
-            if (iswide)
+            if (mod == 0b10)
             { // if wide bit is set consume another byte
                disphigh = content[i];
                i += 1; // consumed a byte
             }
             disp = (signed short)((disphigh << 8) + displow);
          }
-         char *sizeprefix = iswide ? "word": "byte";
+         char *sizeprefix = iswide ? "word" : "byte";
          if (disp && mod) // write displacement suffix
          {
             if (disp < 0)
@@ -299,7 +298,7 @@ int main(int argc, char **argv)
                snprintf(displacement, 32, " + %d", disp);
             }
          }
-         
+
          short data = content[i];
          i += 1;            // consumed a byte
          if (sw_dw == 0b01) // extra byte?
@@ -355,15 +354,9 @@ int main(int argc, char **argv)
                || ((firstbyte & 0b11111110) == 0b00111100)  // cmp
                || ((firstbyte & 0b11111110) == 0b00101100)) // sub
       {
-         char *operation = "add";
-         if ((firstbyte & 0b00111110) == 0b00101100)
-         {
-            operation = "sub";
-         }
-         else if ((firstbyte & 0b00111110) == 0b00111100)
-         {
-            operation = "cmp";
-         }
+         u8 opp = (firstbyte & 0b00111000) >> 3;
+         char *operation = arithmatic_opperations[opp];
+
          short memaddr = content[i];
          i += 1; // consumed a byte
          if (iswide)
@@ -378,6 +371,137 @@ int main(int argc, char **argv)
             signed short imm = (signed short)(char)memaddr;
             printf("%s al, %d\n", operation, imm);
          }
+      }
+      else if (firstbyte == 0b11111111) // push
+      {
+         u8 secondbyte = content[i];
+         i += 1; // consumed a byte
+
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
+
+         char *inst[8] = {"inc", "dec", "call", "call", "jmp", "jmp", "push", "not usec"}; // stolen from https://gist.github.com/tweetandcode/8aa6e9ce3eee0b19fd9ab0ba3c0085a3 thanks @vbyte
+         if (mod == 0b11)
+         {
+            printf("%s %s\n", inst[reg], wordregisters[rm]);
+         }
+         else
+         {
+            char *sizeprefix = iswide ? "word" : "byte";
+            char displacement[32] = "";
+            signed short disp = 0;
+            if (mod != 0 || (mod == 0 && rm == 0b110))
+            {
+               u8 disphigh = 0;
+               u8 displow = content[i];
+               i += 1;                                       // consumed a byte
+               if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
+               {
+                  disphigh = content[i];
+                  i += 1; // consumed a byte
+                  disp = (signed short)((disphigh << 8) + displow);
+               }
+               else
+               {
+                  disp = (signed char)displow;
+               }
+            }
+            if (mod == 0 && rm == 0b110)
+            {
+               printf("%s %s [%d]\n", inst[reg], sizeprefix, disp);
+            }
+            else
+            {
+               if (disp && mod) // write displacement suffix
+               {
+                  if (disp < 0)
+                  {
+                     disp *= -1;
+                     snprintf(displacement, 32, " - %d", disp);
+                  }
+                  else
+                  {
+                     snprintf(displacement, 32, " + %d", disp);
+                  }
+               }
+               char *memaddr = rmtable[rm];
+               printf("%s %s [%s%s]\n", inst[reg], sizeprefix, memaddr, displacement);
+            }
+         }
+      }
+      else if (firstbyte == 0b10001111) // pop rm16
+      {
+         u8 secondbyte = content[i];
+         i += 1; // consumed a byte
+
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
+
+         if (mod == 3)
+            printf("pop %s\n", wordregisters[rm]);
+         else
+         {
+             char *sizeprefix = iswide ? "word" : "byte";
+            char displacement[32] = "";
+            signed short disp = 0;
+            if (mod != 0 || (mod == 0 && rm == 0b110))
+            {
+               u8 disphigh = 0;
+               u8 displow = content[i];
+               i += 1;                                       // consumed a byte
+               if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
+               {
+                  disphigh = content[i];
+                  i += 1; // consumed a byte
+                  disp = (signed short)((disphigh << 8) + displow);
+               }
+               else
+               {
+                  disp = (signed char)displow;
+               }
+            }
+            if (mod == 0 && rm == 0b110)
+            {
+               printf("%s %s [%d]\n", "pop", sizeprefix, disp);
+            }
+            else
+            {
+               if (disp && mod) // write displacement suffix
+               {
+                  if (disp < 0)
+                  {
+                     disp *= -1;
+                     snprintf(displacement, 32, " - %d", disp);
+                  }
+                  else
+                  {
+                     snprintf(displacement, 32, " + %d", disp);
+                  }
+               }
+               char *memaddr = rmtable[rm];
+               printf("%s %s [%s%s]\n", "pop", sizeprefix, memaddr, displacement);
+            }
+         }
+      }
+      else if ((firstbyte & 0b11110000) == 0b01010000) // push/pop register
+      {
+         u8 reg = firstbyte & 0b111;
+         u8 pop = (firstbyte >> 3) & 0b1;
+         printf("%s %s\n", pop ? "pop" : "push", wordregisters[reg]);
+      }
+      else if (firstbyte == 0b00011111) // pop ds
+      {
+         printf("pop ds\n");
+      }
+      else if (firstbyte == 0b00001110) // push cs
+      {
+         printf("push cs\n");
+      }
+      else if (firstbyte == 0b00001110) // push cs
+      {
+         printf("push cs\n");
       }
       else if (firstbyte == 0b01110100) // jz/je
       {
@@ -503,6 +627,7 @@ int main(int argc, char **argv)
       {
          printf("; UNKNOWN OPCODE %x\n", firstbyte);
          i += 1; // just skip to next byte
+         exit(1);
       }
    }
    free(content);
