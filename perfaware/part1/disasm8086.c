@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 
       // opcodes
       if (((firstbyte & 0b11111100) == 0b10001000)    // MOV 1000 10xx  reg/mem to/from reg
-          || ((firstbyte & 0b11111100) == 0b00111000) // cmp 
+          || ((firstbyte & 0b11111100) == 0b00111000) // cmp
           || ((firstbyte & 0b11111100) == 0b00101000) // SUB
           || ((firstbyte & 0b11111100) == 0))         // ADD 0000 00xx
       {
@@ -308,14 +308,14 @@ int main(int argc, char **argv)
             i += 1; // consumed a byte
             data += (data2 << 8);
          }
-         if (mod == 0 && rm == 0b110) //exception on the rule so the 2 bytes are the address and after that comes the value
+         if (mod == 0 && rm == 0b110) // exception on the rule so the 2 bytes are the address and after that comes the value
          {
             short data2 = content[i];
             i += 1; // consumed a byte
             data += (data2 << 8);
 
             short value = content[i];
-            i += 1; 
+            i += 1;
             printf("%s %s [%d%s], %d\n", operation, sizeprefix, data, displacement, value);
          }
          else if (mod == 0b11)
@@ -352,14 +352,15 @@ int main(int argc, char **argv)
          printf("mov [%d], ax\n", memaddr);
       }
       else if (((firstbyte & 0b11111110) == 0b00000100)     // add immediate to accum
-               || ((firstbyte & 0b11111110) == 0b00111100)  //cmp
-               || ((firstbyte & 0b11111110) == 0b00101100)) //sub
+               || ((firstbyte & 0b11111110) == 0b00111100)  // cmp
+               || ((firstbyte & 0b11111110) == 0b00101100)) // sub
       {
          char *operation = "add";
          if ((firstbyte & 0b00111110) == 0b00101100)
          {
             operation = "sub";
-         } else if ((firstbyte & 0b00111110) == 0b00111100)
+         }
+         else if ((firstbyte & 0b00111110) == 0b00111100)
          {
             operation = "cmp";
          }
@@ -378,23 +379,126 @@ int main(int argc, char **argv)
             printf("%s al, %d\n", operation, imm);
          }
       }
-      else if (firstbyte == 0b01110100) //jz/je
+      else if (firstbyte == 0b01110100) // jz/je
       {
          signed char data = content[i];
          i += 1; // consumed a byte
          printf("jz $+2%+d\n", data);
       }
-      else if (firstbyte == 0b01110101) //jnz/jne
+      else if (firstbyte == 0b01110101) // jnz/jne
       {
          signed char data = content[i];
          i += 1; // consumed a byte
          printf("jnz $+2%+d\n", data);
-      } else if (firstbyte == 0b01111100) //jnz/jne
+      }
+      else if (firstbyte == 0b01111100) // jl
       {
          signed char data = content[i];
          i += 1; // consumed a byte
          printf("jl $+2%+d\n", data);
-      }      
+      }
+      else if (firstbyte == 0b01111110) // jlz/jle
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jle $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110010) // jb
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jb $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110110) // jbe
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jbe $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111010) // jp
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jp $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110000) // jo
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jo $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111000) // js
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("js $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111101) // jnl
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jnl $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111111) // jg
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jg $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110011) // jnb/jae
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jnb $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110111) // jnbe/ja
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("ja $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111011) // jnp/jpo
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jnp $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01110001) // jno
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jno $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b01111001) // jns
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jns $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b11100010) // loop
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("loop $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b11100001) // loopz/loope
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("loopz $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b11100000) // loopnz/loopne
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("loopnz $+2%+d\n", data);
+      }
+      else if (firstbyte == 0b11100011) // jcxz
+      {
+         signed char data = content[i];
+         i += 1; // consumed a byte
+         printf("jcxz $+2%+d\n", data);
+      }
       else
       {
          printf("; UNKNOWN OPCODE %x\n", firstbyte);
