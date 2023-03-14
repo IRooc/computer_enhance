@@ -248,7 +248,7 @@ int main(int argc, char **argv)
          }
       }
       else if (((firstbyte & 0b111111100) == 0b10000000)     // add immediate to reg/mem
-               || ((firstbyte & 0b111111100) == 0b10000000)) // sub
+               || ((firstbyte & 0b111111100) == 0b10000000)) // sub cmp
       {
          u8 isreg = 0;
          u8 secondbyte = content[i];
@@ -267,7 +267,6 @@ int main(int argc, char **argv)
          u8 rm = secondbyte & 0x7;
          char *memaddr = rmtable[rm];
          char displacement[32] = "";
-         char *sizeprefix = "byte";
          signed short disp = 0;
          if (mod == 0b11)
          {
@@ -284,10 +283,10 @@ int main(int argc, char **argv)
             { // if wide bit is set consume another byte
                disphigh = content[i];
                i += 1; // consumed a byte
-               sizeprefix = "word";
             }
             disp = (signed short)((disphigh << 8) + displow);
          }
+         char *sizeprefix = iswide ? "word": "byte";
          if (disp && mod) // write displacement suffix
          {
             if (disp < 0)
@@ -300,6 +299,7 @@ int main(int argc, char **argv)
                snprintf(displacement, 32, " + %d", disp);
             }
          }
+         
          short data = content[i];
          i += 1;            // consumed a byte
          if (sw_dw == 0b01) // extra byte?
