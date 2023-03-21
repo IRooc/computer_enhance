@@ -21,7 +21,12 @@ char const *OpcodeMnemonics[] =
 
 static char const *GetMnemonic(operation_type Op)
 {
-    char const *Result = OpcodeMnemonics[Op];
+    char const *Result = "";
+    if(Op < Op_Count)
+    {
+        Result = OpcodeMnemonics[Op];
+    }
+    
     return Result;
 }
 
@@ -45,38 +50,35 @@ static char const *GetRegName(register_access Reg)
         {"ip", "ip", "ip"},
         {"flags", "flags", "flags"}
     };
-    static_assert(ArrayCount(Names) == Register_count, "Text table mismatch for register_index");
     
-    char const *Result = Names[Reg.Index][(Reg.Count == 2) ? 2 : Reg.Offset&1];
+    char const *Result = Names[Reg.Index % ArrayCount(Names)][(Reg.Count == 2) ? 2 : Reg.Offset&1];
     return Result;
 }
 
-static char const *GetEffectiveAddressExpression(effective_address_expression Address)
+static void PrintEffectiveAddressExpression(effective_address_expression Address, FILE *Dest)
 {
-    char const *RMBase[] =
+    char const *Separator = "";
+    for(u32 Index = 0; Index < ArrayCount(Address.Terms); ++Index)
     {
-        "",
-        "bx+si",
-        "bx+di",
-        "bp+si",
-        "bp+di",
-        "si",
-        "di",
-        "bp",
-        "bx",
-    };
-    static_assert(ArrayCount(RMBase) == EffectiveAddress_count, "Text table mismatch for effective_base_address");
-    char const *Result = RMBase[Address.Base];
-    return Result;
-}
-
-static b32 IsPrintable(instruction Instruction)
-{
-    b32 Result = !((Instruction.Op == Op_lock) ||
-                   (Instruction.Op == Op_rep) ||
-                   (Instruction.Op == Op_segment));
+        effective_address_term Term = Address.Terms[Index];
+        register_access Reg = Term.Register;
+        
+        if(Reg.Index)
+        {
+            fprintf(Dest, "%s", Separator);
+            if(Term.Scale != 1)
+            {
+                fprintf(Dest, "%d*", Term.Scale);
+            }
+            fprintf(Dest, "%s", GetRegName(Reg));
+            Separator = "+";
+        }
+    }
     
-    return Result;
+    if(Address.Displacement != 0)
+    {
+        fprintf(Dest, "%+d", Address.Displacement);
+    }
 }
 
 static void PrintInstruction(instruction Instruction, FILE *Dest)
@@ -99,7 +101,7 @@ static void PrintInstruction(instruction Instruction, FILE *Dest)
     char const *MnemonicSuffix = "";
     if(Flags & Inst_Rep)
     {
-        printf("rep ");
+        fprintf(Dest, "rep ");
         MnemonicSuffix = W ? "w" : "b";
     }
     
@@ -127,32 +129,44 @@ static void PrintInstruction(instruction Instruction, FILE *Dest)
                 {
                     effective_address_expression Address = Operand.Address;
 
-                    if(Instruction.Operands[0].Type != Operand_Register)
+                    if(Flags & Inst_Far)
                     {
-                        fprintf(Dest, "%s ", W ? "word" : "byte");
+                        fprintf(Dest, "far ");
                     }
                     
-                    if(Flags & Inst_Segment)
+                    if(Address.Flags & Address_ExplicitSegment)
                     {
-                        printf("%s:", GetRegName({Address.Segment, 0, 2}));
+                        fprintf(Dest, "%u:%u", Address.ExplicitSegment, Address.Displacement);
                     }
-                    
-                    fprintf(Dest, "[%s", GetEffectiveAddressExpression(Address));
-                    if(Address.Displacement != 0)
+                    else
                     {
-                        fprintf(Dest, "%+d", Address.Displacement);
+                        if(Instruction.Operands[0].Type != Operand_Register)
+                        {
+                            fprintf(Dest, "%s ", W ? "word" : "byte");
+                        }
+                        
+                        if(Flags & Inst_Segment)
+                        {
+                            fprintf(Dest, "%s:", GetRegName({Instruction.SegmentOverride, 0, 2}));
+                        }
+                        
+                        fprintf(Dest, "[");
+                        PrintEffectiveAddressExpression(Address, Dest);
+                        fprintf(Dest, "]");
                     }
-                    fprintf(Dest, "]");
                 } break;
                 
                 case Operand_Immediate:
                 {
-                    fprintf(Dest, "%d", Operand.ImmediateS32);
-                } break;
-                
-                case Operand_RelativeImmediate:
-                {
-                    fprintf(Dest, "$%+d", Operand.ImmediateS32);
+                    immediate Immediate = Operand.Immediate;
+                    if(Immediate.Flags & Immediate_RelativeJumpDisplacement)
+                    {
+                        fprintf(Dest, "$%+d", Immediate.Value + Instruction.Size);
+                    }
+                    else
+                    {
+                        fprintf(Dest, "%d", Immediate.Value);
+                    }
                 } break;
             }
         }
