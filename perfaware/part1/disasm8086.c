@@ -26,6 +26,8 @@ SimpleInstruction basicinstructions[] = {
     {0b10011110, "sahf"},
     {0b10011100, "pushf"},
     {0b10011101, "popf"},
+    {0b00110111, "aaa"},
+    {0b00100111, "daa"},
 };
 
 SimpleInstruction jumps[] = {
@@ -603,6 +605,26 @@ int main(int argc, char **argv)
       {
          u8 reg = firstbyte & 0b111;
          printf("inc %s\n", wordregisters[reg]);
+      }
+      else if ((firstbyte & 0b11111110) == 0b11111110) // inc
+      {
+         u8 secondbyte = read_byte();
+
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
+
+         char **memaddr = iswide ? wordregisters : byteregisters;
+         if (mod == 0b11)
+         {
+            printf("inc %s\n", memaddr[rm]);
+         }
+         else
+         {
+            char *displacement = read_displacement(mod, rm);
+            char *rr = rmtable[rm];
+            printf("inc byte [%s%s]\n", rr, displacement);
+         }
       }
       else if ((firstbyte & 0b11111100) == 0b11100100) // in_out data-8
       {
