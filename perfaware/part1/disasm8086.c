@@ -283,7 +283,6 @@ int main(int argc, char **argv)
             if (mod == 0b10)
             { // if wide bit is set consume another byte
                disphigh = read_byte();
-
             }
             disp = (signed short)((disphigh << 8) + displow);
          }
@@ -380,7 +379,6 @@ int main(int argc, char **argv)
       {
          u8 secondbyte = read_byte();
 
-
          u8 mod = (secondbyte & 0b11000000) >> 6;
          u8 reg = (secondbyte & 0b00111000) >> 3;
          u8 rm = secondbyte & 0b111;
@@ -437,7 +435,6 @@ int main(int argc, char **argv)
       else if (firstbyte == 0b10001111) // pop rm16
       {
          u8 secondbyte = read_byte();
-
 
          u8 mod = (secondbyte & 0b11000000) >> 6;
          u8 reg = (secondbyte & 0b00111000) >> 3;
@@ -527,10 +524,27 @@ int main(int argc, char **argv)
                {
                   disp = (signed char)displow;
                }
+               if (disp)
+               {
+                  if (disp < 0)
+                  {
+                     snprintf(displacement, 32, " - %d", disp * -1);
+                  }
+                  else
+                  {
+                     snprintf(displacement, 32, " + %d", disp);
+                  }
+               }
             }
             char *rr = rmtable[rm];
-            printf("xchg %s, [%s%s];TODO\n", memaddr[reg], rr, displacement);
+            printf("xchg %s, [%s%s];TODO check order\n", memaddr[reg], rr, displacement);
          }
+      }
+      else if ((firstbyte & 0b11111000) == 0b10010000) // xchg to accum
+      {
+         u8 reg = firstbyte & 0b111;
+         printf("xchg ax, %s\n", wordregisters[reg]);
+
       }
       else if (firstbyte == 0b00011111) // pop ds
       {
