@@ -477,7 +477,7 @@ int main(int argc, char **argv)
          u8 reg = (secondbyte & 0b00111000) >> 3;
          u8 rm = secondbyte & 0b111;
 
-         char *inst[8] = {"inc", "dec", "call", "call", "jmp", "jmp", "push", "not usec"}; // stolen from https://gist.github.com/tweetandcode/8aa6e9ce3eee0b19fd9ab0ba3c0085a3 thanks @vbyte
+         char *inst[8] = {"inc", "dec", "call", "call", "jmp", "jmp", "push", "--"}; // stolen from https://gist.github.com/tweetandcode/8aa6e9ce3eee0b19fd9ab0ba3c0085a3 thanks @vbyte
          if (mod == 0b11)
          {
             printf("%s %s\n", inst[reg], wordregisters[rm]);
@@ -606,6 +606,32 @@ int main(int argc, char **argv)
             printf("xchg %s, [%s%s];TODO check order\n", memaddr[reg], rr, displacement);
          }
       }
+      else if ((firstbyte & 0b11111100) == 0b11010000) // shifts:
+      {
+
+         int v = (firstbyte >> 1) & 0x1;
+         u8 secondbyte = read_byte();
+
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
+
+         char *opp[8] = {"rol", "ror", "rcl", "rcr", "shl", "shr", "--", "sar"};
+         char *source[2] = {"1", "cl"};
+
+         char **memaddr = iswide ? wordregisters : byteregisters;
+         if (mod == 0b11)
+         {
+            printf("%s %s, %s\n", opp[reg], memaddr[rm], source[v]);
+         }
+         else
+         {
+            char *displacement = read_displacement(mod, rm);
+            char *sizeprefix = iswide ? "word" : "byte";
+            char *rr = rmtable[rm];
+            printf("%s %s [%s%s], %s\n", opp[reg], sizeprefix, rr, displacement, source[v]);
+         }
+      }
       else if ((firstbyte & 0b11111000) == 0b10010000) // xchg to accum
       {
          u8 reg = firstbyte & 0b111;
@@ -704,11 +730,13 @@ int main(int argc, char **argv)
             printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
          }
       }
-      else if (firstbyte == 0b11010100) {
+      else if (firstbyte == 0b11010100)
+      {
          u8 xtra = read_byte();
          printf("aam\n");
       }
-      else if (firstbyte == 0b11010101) {
+      else if (firstbyte == 0b11010101)
+      {
          u8 xtra = read_byte();
          printf("aad\n");
       }
