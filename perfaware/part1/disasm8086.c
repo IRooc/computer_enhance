@@ -28,6 +28,10 @@ SimpleInstruction basicinstructions[] = {
     {0b10011101, "popf"},
     {0b00110111, "aaa"},
     {0b00100111, "daa"},
+    {0b00111111, "aas"},
+    {0b00101111, "das"},
+    {0b10011000, "cbw"},
+    {0b10011001, "cwd"},
 };
 
 SimpleInstruction jumps[] = {
@@ -166,6 +170,7 @@ int main(int argc, char **argv)
       if (((firstbyte & 0b11111100) == 0b10001000)    // MOV 1000 10xx  reg/mem to/from reg
           || ((firstbyte & 0b11111100) == 0b00111000) // cmp
           || ((firstbyte & 0b11111100) == 0b00101000) // SUB
+          || ((firstbyte & 0b11111100) == 0b00011000) // SBB
           || ((firstbyte & 0b11111100) == 0b00010000) // ADC 0001 00xx
           || ((firstbyte & 0b11111100) == 0))         // ADD 0000 00xx
       {
@@ -356,6 +361,10 @@ int main(int argc, char **argv)
          {
             operation = "adc";
          }
+         else if (oper == 0b011)
+         {
+            operation = "sbb";
+         }
          char *memaddr = rmtable[rm];
          signed short disp = 0;
          if (mod == 0b10 || mod == 0b01)
@@ -438,6 +447,7 @@ int main(int argc, char **argv)
       }
       else if (((firstbyte & 0b11111110) == 0b00000100)     // add immediate to accum
                || ((firstbyte & 0b11111110) == 0b00010100)  // adc
+               || ((firstbyte & 0b11111110) == 0b00011100)  // sbb
                || ((firstbyte & 0b11111110) == 0b00111100)  // cmp
                || ((firstbyte & 0b11111110) == 0b00101100)) // sub
       {
@@ -601,12 +611,15 @@ int main(int argc, char **argv)
          u8 reg = firstbyte & 0b111;
          printf("xchg ax, %s\n", wordregisters[reg]);
       }
-      else if ((firstbyte & 0b11111000) == 0b01000000) // inc to accum
+      else if (((firstbyte & 0b11111000) == 0b01000000)     // inc register
+               || ((firstbyte & 0b11111000) == 0b01001000)) // dec
       {
          u8 reg = firstbyte & 0b111;
-         printf("inc %s\n", wordregisters[reg]);
+         char *opp = (firstbyte & 0b00001000) ? "dec" : "inc";
+         printf("%s %s\n", opp, wordregisters[reg]);
       }
-      else if ((firstbyte & 0b11111110) == 0b11111110) // inc
+      else if (((firstbyte & 0b11111110) == 0b11111110)     // inc // dec
+               || ((firstbyte & 0b11111110) == 0b11110110)) // neg
       {
          u8 secondbyte = read_byte();
 
@@ -614,16 +627,31 @@ int main(int argc, char **argv)
          u8 reg = (secondbyte & 0b00111000) >> 3;
          u8 rm = secondbyte & 0b111;
 
+         char *inst[8] = {"inc", "dec", "not", "neg", "mul", "imul", "div", "idiv"};
+         char *opp = inst[reg];
          char **memaddr = iswide ? wordregisters : byteregisters;
          if (mod == 0b11)
          {
-            printf("inc %s\n", memaddr[rm]);
+            printf("%s %s\n", opp, memaddr[rm]);
          }
          else
          {
-            char *displacement = read_displacement(mod, rm);
-            char *rr = rmtable[rm];
-            printf("inc byte [%s%s]\n", rr, displacement);
+            char *sizeprefix = iswide ? "word" : "byte";
+
+            if (mod == 0 && rm == 0b110)
+            {
+               u8 low = read_byte();
+               u8 high = read_byte();
+
+               short rr = (high << 8) + low;
+               printf("%s %s [%d]\n", opp, sizeprefix, rr);
+            }
+            else
+            {
+               char *displacement = read_displacement(mod, rm);
+               char *rr = rmtable[rm];
+               printf("%s %s [%s%s]\n", opp, sizeprefix, rr, displacement);
+            }
          }
       }
       else if ((firstbyte & 0b11111100) == 0b11100100) // in_out data-8
@@ -676,10 +704,18 @@ int main(int argc, char **argv)
             printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
          }
       }
+      else if (firstbyte == 0b11010100) {
+         u8 xtra = read_byte();
+         printf("aam\n");
+      }
+      else if (firstbyte == 0b11010101) {
+         u8 xtra = read_byte();
+         printf("aad\n");
+      }
       else
       {
          u8 handled = 0;
-         //jumps
+         // jumps
          for (int i = 0; i < ArrayCount(jumps); i++)
          {
             if (jumps[i].pattern == firstbyte)
@@ -689,7 +725,7 @@ int main(int argc, char **argv)
                handled = 1;
             }
          }
-         //basics
+         // basics
          for (int i = 0; i < ArrayCount(basicinstructions); i++)
          {
             if (basicinstructions[i].pattern == firstbyte)
