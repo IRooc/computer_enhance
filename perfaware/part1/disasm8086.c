@@ -544,6 +544,32 @@ int main(int argc, char **argv)
       {
          u8 reg = firstbyte & 0b111;
          printf("xchg ax, %s\n", wordregisters[reg]);
+      }
+      else if ((firstbyte & 0b11111100) == 0b11100100) // in_out data-8
+      {
+         char* reg = iswide ? "ax" : "al";
+         u8 data = read_byte();
+
+         if (firstbyte & 0b00000010)
+         {
+            printf("out %d, %s\n", data, reg);
+         }
+         else
+         {
+            printf("in %s, %d\n", reg, data);
+         }
+      }
+      else if ((firstbyte & 0b11111100) == 0b11101100) // in_out nodata
+      {
+         char* reg = iswide ? "ax" : "al";
+         if (firstbyte & 0b00000010)
+         {
+            printf("out dx, %s\n", reg);
+         }
+         else
+         {
+            printf("in %s, dx\n", reg);
+         }
 
       }
       else if (firstbyte == 0b00011111) // pop ds
