@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 typedef uint8_t u8;
 
 static char *byteregisters[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
@@ -10,6 +11,45 @@ static char *wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
 static char *rmtable[] = {"bx + si", "bx + di", "bp + si", "bp + di", "si", "di", "bp", "bx"};
 
 static char *arithmatic_opperations[8] = {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
+
+typedef struct
+{
+   u8 pattern;
+   char *instruction;
+} SimpleInstruction;
+
+SimpleInstruction basicinstructions[] = {
+    {0b00011111, "pop ds"},
+    {0b00001110, "push cs"},
+    {0b11010111, "xlat"},
+    {0b10011111, "lahf"},
+    {0b10011110, "sahf"},
+    {0b10011100, "pushf"},
+    {0b10011101, "popf"},
+};
+
+SimpleInstruction jumps[] = {
+    {0b01110100, "jz"},
+    {0b01110101, "jnz"},
+    {0b01111100, "jl"},
+    {0b01111110, "jlz"},
+    {0b01110010, "jb"},
+    {0b01110110, "jbe"},
+    {0b01111010, "jp"},
+    {0b01110000, "jo"},
+    {0b01111000, "js"},
+    {0b01111101, "jnl"},
+    {0b01111111, "jg"},
+    {0b01110011, "jnb"},
+    {0b01110111, "ja"},
+    {0b01111011, "jnp"},
+    {0b01110001, "jno"},
+    {0b01111001, "jns"},
+    {0b11100010, "loop"},
+    {0b11100001, "loopz"},
+    {0b11100000, "loopnz"},
+    {0b11100011, "jcxz"},
+};
 
 // instruction pointer
 int ip = 0;
@@ -21,6 +61,41 @@ u8 read_byte()
    u8 result = content[ip];
    ip += 1;
    return result;
+}
+// used only on single instances
+char displacement[32] = "";
+char *read_displacement(u8 mod, u8 rm)
+{
+   sprintf(displacement, "");
+   signed short disp = 0;
+   if (mod != 0 || (mod == 0 && rm == 0b110))
+   {
+      u8 disphigh = 0;
+      u8 displow = read_byte();
+
+      if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
+      {
+         disphigh = read_byte();
+
+         disp = (signed short)((disphigh << 8) + displow);
+      }
+      else
+      {
+         disp = (signed char)displow;
+      }
+      if (disp)
+      {
+         if (disp < 0)
+         {
+            snprintf(displacement, 32, " - %d", disp * -1);
+         }
+         else
+         {
+            snprintf(displacement, 32, " + %d", disp);
+         }
+      }
+   }
+   return displacement;
 }
 
 int main(int argc, char **argv)
@@ -89,6 +164,7 @@ int main(int argc, char **argv)
       if (((firstbyte & 0b11111100) == 0b10001000)    // MOV 1000 10xx  reg/mem to/from reg
           || ((firstbyte & 0b11111100) == 0b00111000) // cmp
           || ((firstbyte & 0b11111100) == 0b00101000) // SUB
+          || ((firstbyte & 0b11111100) == 0b00010000) // ADC 0001 00xx
           || ((firstbyte & 0b11111100) == 0))         // ADD 0000 00xx
       {
          u8 *operation = "mov";
@@ -254,6 +330,7 @@ int main(int argc, char **argv)
          }
       }
       else if (((firstbyte & 0b111111100) == 0b10000000)     // add immediate to reg/mem
+               || ((firstbyte & 0b111111100) == 0b10000000)  // adc
                || ((firstbyte & 0b111111100) == 0b10000000)) // sub cmp
       {
          u8 secondbyte = read_byte();
@@ -272,6 +349,10 @@ int main(int argc, char **argv)
          else if (oper == 0b111)
          {
             operation = "cmp";
+         }
+         else if (oper == 0b010)
+         {
+            operation = "adc";
          }
          char *memaddr = rmtable[rm];
          signed short disp = 0;
@@ -354,6 +435,7 @@ int main(int argc, char **argv)
          printf("mov [%d], ax\n", memaddr);
       }
       else if (((firstbyte & 0b11111110) == 0b00000100)     // add immediate to accum
+               || ((firstbyte & 0b11111110) == 0b00010100)  // adc
                || ((firstbyte & 0b11111110) == 0b00111100)  // cmp
                || ((firstbyte & 0b11111110) == 0b00101100)) // sub
       {
@@ -445,7 +527,6 @@ int main(int argc, char **argv)
          else
          {
             char *sizeprefix = iswide ? "word" : "byte";
-            char displacement[32] = "";
             signed short disp = 0;
             if (mod != 0 || (mod == 0 && rm == 0b110))
             {
@@ -469,6 +550,7 @@ int main(int argc, char **argv)
             }
             else
             {
+               char displacement[32] = "";
                if (disp && mod) // write displacement suffix
                {
                   if (disp < 0)
@@ -507,35 +589,7 @@ int main(int argc, char **argv)
          }
          else
          {
-            char displacement[32] = "";
-            signed short disp = 0;
-            if (mod != 0 || (mod == 0 && rm == 0b110))
-            {
-               u8 disphigh = 0;
-               u8 displow = read_byte();
-
-               if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
-               {
-                  disphigh = read_byte();
-
-                  disp = (signed short)((disphigh << 8) + displow);
-               }
-               else
-               {
-                  disp = (signed char)displow;
-               }
-               if (disp)
-               {
-                  if (disp < 0)
-                  {
-                     snprintf(displacement, 32, " - %d", disp * -1);
-                  }
-                  else
-                  {
-                     snprintf(displacement, 32, " + %d", disp);
-                  }
-               }
-            }
+            char *displacement = read_displacement(mod, rm);
             char *rr = rmtable[rm];
             printf("xchg %s, [%s%s];TODO check order\n", memaddr[reg], rr, displacement);
          }
@@ -545,9 +599,14 @@ int main(int argc, char **argv)
          u8 reg = firstbyte & 0b111;
          printf("xchg ax, %s\n", wordregisters[reg]);
       }
+      else if ((firstbyte & 0b11111000) == 0b01000000) // inc to accum
+      {
+         u8 reg = firstbyte & 0b111;
+         printf("inc %s\n", wordregisters[reg]);
+      }
       else if ((firstbyte & 0b11111100) == 0b11100100) // in_out data-8
       {
-         char* reg = iswide ? "ax" : "al";
+         char *reg = iswide ? "ax" : "al";
          u8 data = read_byte();
 
          if (firstbyte & 0b00000010)
@@ -561,7 +620,7 @@ int main(int argc, char **argv)
       }
       else if ((firstbyte & 0b11111100) == 0b11101100) // in_out nodata
       {
-         char* reg = iswide ? "ax" : "al";
+         char *reg = iswide ? "ax" : "al";
          if (firstbyte & 0b00000010)
          {
             printf("out dx, %s\n", reg);
@@ -570,145 +629,59 @@ int main(int argc, char **argv)
          {
             printf("in %s, dx\n", reg);
          }
+      }
+      else if ((firstbyte == 0b10001101) // lea, lds, les
+               || (firstbyte == 0b11000101) || (firstbyte == 0b11000100))
+      {
+         u8 secondbyte = read_byte();
 
-      }
-      else if (firstbyte == 0b00011111) // pop ds
-      {
-         printf("pop ds\n");
-      }
-      else if (firstbyte == 0b00001110) // push cs
-      {
-         printf("push cs\n");
-      }
-      else if (firstbyte == 0b00001110) // push cs
-      {
-         printf("push cs\n");
-      }
-      else if (firstbyte == 0b01110100) // jz/je
-      {
-         signed char data = read_byte();
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
 
-         printf("jz $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110101) // jnz/jne
-      {
-         signed char data = read_byte();
+         char *opp = (firstbyte == 0b11000100) ? "les" : (firstbyte == 0b11000101) ? "lds"
+                                                                                   : "lea";
 
-         printf("jnz $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111100) // jl
-      {
-         signed char data = read_byte();
-
-         printf("jl $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111110) // jlz/jle
-      {
-         signed char data = read_byte();
-
-         printf("jle $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110010) // jb
-      {
-         signed char data = read_byte();
-
-         printf("jb $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110110) // jbe
-      {
-         signed char data = read_byte();
-
-         printf("jbe $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111010) // jp
-      {
-         signed char data = read_byte();
-
-         printf("jp $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110000) // jo
-      {
-         signed char data = read_byte();
-
-         printf("jo $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111000) // js
-      {
-         signed char data = read_byte();
-
-         printf("js $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111101) // jnl
-      {
-         signed char data = read_byte();
-
-         printf("jnl $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111111) // jg
-      {
-         signed char data = read_byte();
-
-         printf("jg $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110011) // jnb/jae
-      {
-         signed char data = read_byte();
-
-         printf("jnb $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110111) // jnbe/ja
-      {
-         signed char data = read_byte();
-
-         printf("ja $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111011) // jnp/jpo
-      {
-         signed char data = read_byte();
-
-         printf("jnp $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01110001) // jno
-      {
-         signed char data = read_byte();
-
-         printf("jno $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b01111001) // jns
-      {
-         signed char data = read_byte();
-
-         printf("jns $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b11100010) // loop
-      {
-         signed char data = read_byte();
-
-         printf("loop $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b11100001) // loopz/loope
-      {
-         signed char data = read_byte();
-
-         printf("loopz $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b11100000) // loopnz/loopne
-      {
-         signed char data = read_byte();
-
-         printf("loopnz $+2%+d\n", data);
-      }
-      else if (firstbyte == 0b11100011) // jcxz
-      {
-         signed char data = read_byte();
-
-         printf("jcxz $+2%+d\n", data);
+         char **memaddr = wordregisters;
+         if (mod == 0b11)
+         {
+            printf("xchg %s, %s\n", memaddr[reg], memaddr[rm]);
+         }
+         else
+         {
+            char *displacement = read_displacement(mod, rm);
+            char *rr = rmtable[rm];
+            printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
+         }
       }
       else
       {
-         printf("; UNKNOWN OPCODE %x\n", firstbyte);
-         ip += 1; // just skip to next byte
-         exit(1);
+         u8 handled = 0;
+         //jumps
+         for (int i = 0; i < ArrayCount(jumps); i++)
+         {
+            if (jumps[i].pattern == firstbyte)
+            {
+               signed char data = read_byte();
+               printf("%s $+2%+d\n", jumps[i].instruction, data);
+               handled = 1;
+            }
+         }
+         //basics
+         for (int i = 0; i < ArrayCount(basicinstructions); i++)
+         {
+            if (basicinstructions[i].pattern == firstbyte)
+            {
+               printf("%s\n", basicinstructions[i].instruction);
+               handled = 1;
+            }
+         }
+
+         if (!handled)
+         {
+            printf("; UNKNOWN OPCODE %x\n", firstbyte);
+            exit(1);
+         }
       }
    }
    free(content);
