@@ -4,6 +4,7 @@
 
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 typedef uint8_t u8;
+typedef u8 bool;
 
 static char *byteregisters[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
 static char *wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
@@ -16,45 +17,45 @@ typedef struct
 {
    u8 pattern;
    char *instruction;
+   char *printformat;
+   bool readbyte;
 } SimpleInstruction;
 
-SimpleInstruction basicinstructions[] = {
-    {0b00011111, "pop ds"},
-    {0b00001110, "push cs"},
-    {0b11010111, "xlat"},
-    {0b10011111, "lahf"},
-    {0b10011110, "sahf"},
-    {0b10011100, "pushf"},
-    {0b10011101, "popf"},
-    {0b00110111, "aaa"},
-    {0b00100111, "daa"},
-    {0b00111111, "aas"},
-    {0b00101111, "das"},
-    {0b10011000, "cbw"},
-    {0b10011001, "cwd"},
-};
-
 SimpleInstruction jumps[] = {
-    {0b01110100, "jz"},
-    {0b01110101, "jnz"},
-    {0b01111100, "jl"},
-    {0b01111110, "jlz"},
-    {0b01110010, "jb"},
-    {0b01110110, "jbe"},
-    {0b01111010, "jp"},
-    {0b01110000, "jo"},
-    {0b01111000, "js"},
-    {0b01111101, "jnl"},
-    {0b01111111, "jg"},
-    {0b01110011, "jnb"},
-    {0b01110111, "ja"},
-    {0b01111011, "jnp"},
-    {0b01110001, "jno"},
-    {0b01111001, "jns"},
-    {0b11100010, "loop"},
-    {0b11100001, "loopz"},
-    {0b11100000, "loopnz"},
-    {0b11100011, "jcxz"},
+    {0b00011111, "pop ds","pop ds\n", 0},
+    {0b00001110, "push cs", "push cs\n", 0},
+    {0b11010111, "xlat", "xlat\n", 0},
+    {0b10011111, "lahf", "lahf\n", 0},
+    {0b10011110, "sahf", "sahf\n", 0},
+    {0b10011100, "pushf", "pushf\n", 0},
+    {0b10011101, "popf", "popf\n", 0},
+    {0b00110111, "aaa", "aaa\n", 0},
+    {0b00100111, "daa", "daa\n", 0},
+    {0b00111111, "aas", "aas\n", 0},
+    {0b00101111, "das", "das\n", 0},
+    {0b10011000, "cbw", "cbw\n", 0},
+    {0b10011001, "cwd", "cwd\n", 0},
+
+    {0b01110100, "jz", "%s $+2%+d\n", 1},
+    {0b01110101, "jnz", "%s $+2%+d\n", 1},
+    {0b01111100, "jl", "%s $+2%+d\n", 1},
+    {0b01111110, "jlz", "%s $+2%+d\n", 1},
+    {0b01110010, "jb", "%s $+2%+d\n", 1},
+    {0b01110110, "jbe", "%s $+2%+d\n", 1},
+    {0b01111010, "jp", "%s $+2%+d\n", 1},
+    {0b01110000, "jo", "%s $+2%+d\n", 1},
+    {0b01111000, "js", "%s $+2%+d\n", 1},
+    {0b01111101, "jnl", "%s $+2%+d\n", 1},
+    {0b01111111, "jg", "%s $+2%+d\n", 1},
+    {0b01110011, "jnb", "%s $+2%+d\n", 1},
+    {0b01110111, "ja", "%s $+2%+d\n", 1},
+    {0b01111011, "jnp", "%s $+2%+d\n", 1},
+    {0b01110001, "jno", "%s $+2%+d\n", 1},
+    {0b01111001, "jns", "%s $+2%+d\n", 1},
+    {0b11100010, "loop", "%s $+2%+d\n", 1},
+    {0b11100001, "loopz", "%s $+2%+d\n", 1},
+    {0b11100000, "loopnz", "%s $+2%+d\n", 1},
+    {0b11100011, "jcxz", "%s $+2%+d\n", 1},
 };
 
 // instruction pointer
@@ -743,23 +744,25 @@ int main(int argc, char **argv)
       else
       {
          u8 handled = 0;
-         // jumps
+         // simple instructions
          for (int i = 0; i < ArrayCount(jumps); i++)
          {
-            if (jumps[i].pattern == firstbyte)
+            SimpleInstruction instr = jumps[i];
+            if (instr.pattern == firstbyte)
             {
-               signed char data = read_byte();
-               printf("%s $+2%+d\n", jumps[i].instruction, data);
-               handled = 1;
-            }
-         }
-         // basics
-         for (int i = 0; i < ArrayCount(basicinstructions); i++)
-         {
-            if (basicinstructions[i].pattern == firstbyte)
-            {
-               printf("%s\n", basicinstructions[i].instruction);
-               handled = 1;
+               if (instr.readbyte)
+               {
+                  signed char data = read_byte();
+                  printf(instr.printformat, instr.instruction, data);
+                  handled = 1;
+                  break;
+               }
+               else
+               {
+                  printf(instr.printformat, instr.instruction);
+                  handled = 1;
+                  break;
+               }
             }
          }
 
