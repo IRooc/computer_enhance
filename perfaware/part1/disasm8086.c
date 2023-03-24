@@ -92,13 +92,20 @@ char *read_displacement(u8 mod, u8 rm, signed short *disp)
       }
       if (*disp)
       {
-         if (*disp < 0)
+         if (mod == 0 && rm == 0b110)
          {
-            snprintf(displacement, 32, " - %d", *disp * -1);
+            sprintf(displacement, "%d", *disp);
          }
          else
          {
-            snprintf(displacement, 32, " + %d", *disp);
+            if (*disp < 0)
+            {
+               snprintf(displacement, 32, " - %d", *disp * -1);
+            }
+            else
+            {
+               snprintf(displacement, 32, " + %d", *disp);
+            }
          }
       }
    }
@@ -204,45 +211,8 @@ int main(int argc, char **argv)
          else // mem to reg or reg to mem
          {
             char *memaddr = rmtable[rm];
-            char displacement[32] = "";
-            signed short disp = 0;
-            if (mod == 1) // 8 bit displacement
-            {
-               u8 displow = read_byte();
-
-               if (displow)
-               {
-                  signed char disp = (signed char)displow;
-                  if (disp < 0)
-                  {
-                     snprintf(displacement, 32, " - %d", disp * -1);
-                  }
-                  else
-                  {
-                     snprintf(displacement, 32, " + %d", disp);
-                  }
-               }
-            }
-            else if (mod == 0b10 || (mod == 0 && rm == 0b110)) // 16 bit displacement
-            {
-               u8 displow = read_byte();
-
-               u8 disphigh = read_byte();
-
-               disp = (signed short)((disphigh << 8) + displow);
-               if (disp)
-               {
-                  if (disp < 0)
-                  {
-                     disp *= -1;
-                     snprintf(displacement, 32, " - %d", disp);
-                  }
-                  else
-                  {
-                     snprintf(displacement, 32, " + %d", disp);
-                  }
-               }
-            }
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
 
             if (sw_dw & 0b10) // is the destination a registry
             {
@@ -287,40 +257,14 @@ int main(int argc, char **argv)
          u8 mod = (secondbyte & 0xC0) >> 6;
          u8 rm = secondbyte & 0x7;
          char *memaddr = rmtable[rm];
-         char displacement[32] = "";
-         char *sizeprefix = "byte";
-         signed short disp = 0;
-         if (mod == 0b10 || mod == 0b01)
-         {
-            u8 displow = read_byte();
+         char *sizeprefix = iswide ? "word" : "byte";
+         signed short disp;
+         char *displacement = read_displacement(mod, rm, &disp);
 
-            u8 disphigh = 0;
-            if (mod == 0b10)
-            { // if wide bit is set consume another byte
-               disphigh = read_byte();
-
-               sizeprefix = "word";
-            }
-            disp = (signed short)((disphigh << 8) + displow);
-         }
-         if (disp && mod) // write displacement suffix
-         {
-            if (disp < 0)
-            {
-               disp *= -1;
-               snprintf(displacement, 32, " - %d", disp);
-            }
-            else
-            {
-               snprintf(displacement, 32, " + %d", disp);
-            }
-         }
          short data = read_byte();
-
          if (iswide) // wide?
          {
             short data2 = read_byte();
-
             data += (data2 << 8);
          }
 
@@ -482,24 +426,8 @@ int main(int argc, char **argv)
          else
          {
             char *sizeprefix = iswide ? "word" : "byte";
-            char displacement[32] = "";
-            signed short disp = 0;
-            if (mod != 0 || (mod == 0 && rm == 0b110))
-            {
-               u8 disphigh = 0;
-               u8 displow = read_byte();
-
-               if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
-               {
-                  disphigh = read_byte();
-
-                  disp = (signed short)((disphigh << 8) + displow);
-               }
-               else
-               {
-                  disp = (signed char)displow;
-               }
-            }
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
             if (mod == 0 && rm == 0b110)
             {
                printf("%s %s [%d]\n", inst[reg], sizeprefix, disp);
@@ -628,6 +556,10 @@ int main(int argc, char **argv)
             char *displacement = read_displacement(mod, rm, &disp);
             char *sizeprefix = iswide ? "word" : "byte";
             char *rr = rmtable[rm];
+            if (mod == 0 && rm == 0b110)
+            {
+               rr = "";
+            }
             printf("%s %s [%s%s], %s\n", opp[reg], sizeprefix, rr, displacement, source[v]);
          }
       }
@@ -769,7 +701,6 @@ int main(int argc, char **argv)
             if (mod == 0 && rm == 0b110)
             {
                rr = "";
-               sprintf(displacement,"%d", disp);
             }
             if (sw_dw & 0b10) // if the D bit is set swap dst and src;
             {
