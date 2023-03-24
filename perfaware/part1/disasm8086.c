@@ -13,49 +13,81 @@ static char *rmtable[] = {"bx + si", "bx + di", "bp + si", "bp + di", "si", "di"
 
 static char *arithmatic_opperations[8] = {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
 
+typedef enum
+{
+   IT_BARE,
+   IT_SINGLEBYTE,
+   IT_SINGLEBYTE_UNSIGNED,
+   IT_EXTRABYTE_POSSIBLE_WIDE,
+   IT_MOD_RM_REG
+} InstructionType;
+
 typedef struct
 {
    u8 pattern;
    char *instruction;
    char *printformat;
-   bool readbyte;
+   InstructionType type;
 } SimpleInstruction;
 
 SimpleInstruction jumps[] = {
-    {0b00011111, "pop ds", "pop ds\n", 0},
-    {0b00001110, "push cs", "push cs\n", 0},
-    {0b11010111, "xlat", "xlat\n", 0},
-    {0b10011111, "lahf", "lahf\n", 0},
-    {0b10011110, "sahf", "sahf\n", 0},
-    {0b10011100, "pushf", "pushf\n", 0},
-    {0b10011101, "popf", "popf\n", 0},
-    {0b00110111, "aaa", "aaa\n", 0},
-    {0b00100111, "daa", "daa\n", 0},
-    {0b00111111, "aas", "aas\n", 0},
-    {0b00101111, "das", "das\n", 0},
-    {0b10011000, "cbw", "cbw\n", 0},
-    {0b10011001, "cwd", "cwd\n", 0},
+    // single byte instructutions
+    {0b00011111, "pop ds", "pop ds\n", IT_BARE},
+    {0b00001110, "push cs", "push cs\n", IT_BARE},
+    {0b11010111, "xlat", "xlat\n", IT_BARE},
+    {0b10011111, "lahf", "lahf\n", IT_BARE},
+    {0b10011110, "sahf", "sahf\n", IT_BARE},
+    {0b10011100, "pushf", "pushf\n", IT_BARE},
+    {0b10011101, "popf", "popf\n", IT_BARE},
+    {0b00110111, "aaa", "aaa\n", IT_BARE},
+    {0b00100111, "daa", "daa\n", IT_BARE},
+    {0b00111111, "aas", "aas\n", IT_BARE},
+    {0b00101111, "das", "das\n", IT_BARE},
+    {0b10011000, "cbw", "cbw\n", IT_BARE},
+    {0b10011001, "cwd", "cwd\n", IT_BARE},
 
-    {0b01110100, "jz", "%s $+2%+d\n", 1},
-    {0b01110101, "jnz", "%s $+2%+d\n", 1},
-    {0b01111100, "jl", "%s $+2%+d\n", 1},
-    {0b01111110, "jlz", "%s $+2%+d\n", 1},
-    {0b01110010, "jb", "%s $+2%+d\n", 1},
-    {0b01110110, "jbe", "%s $+2%+d\n", 1},
-    {0b01111010, "jp", "%s $+2%+d\n", 1},
-    {0b01110000, "jo", "%s $+2%+d\n", 1},
-    {0b01111000, "js", "%s $+2%+d\n", 1},
-    {0b01111101, "jnl", "%s $+2%+d\n", 1},
-    {0b01111111, "jg", "%s $+2%+d\n", 1},
-    {0b01110011, "jnb", "%s $+2%+d\n", 1},
-    {0b01110111, "ja", "%s $+2%+d\n", 1},
-    {0b01111011, "jnp", "%s $+2%+d\n", 1},
-    {0b01110001, "jno", "%s $+2%+d\n", 1},
-    {0b01111001, "jns", "%s $+2%+d\n", 1},
-    {0b11100010, "loop", "%s $+2%+d\n", 1},
-    {0b11100001, "loopz", "%s $+2%+d\n", 1},
-    {0b11100000, "loopnz", "%s $+2%+d\n", 1},
-    {0b11100011, "jcxz", "%s $+2%+d\n", 1},
+    // two byte instructutions
+    {0b01110100, "jz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110101, "jnz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111100, "jl", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111110, "jlz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110010, "jb", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110110, "jbe", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111010, "jp", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110000, "jo", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111000, "js", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111101, "jnl", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111111, "jg", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110011, "jnb", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110111, "ja", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111011, "jnp", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01110001, "jno", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b01111001, "jns", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100010, "loop", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100001, "loopz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100000, "loopnz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
+    
+    {0b11010100, "aam", "%s\n", IT_SINGLEBYTE}, //extra byte is ignored
+    {0b11010101, "aad", "%s\n", IT_SINGLEBYTE}, //extra byte is ignored
+
+    {0b11101100, "in", "%s al, dx\n", IT_BARE},
+    {0b11101101, "in", "%s ax, dx\n", IT_BARE},
+    {0b11100100, "in", "%s al, %d\n", IT_SINGLEBYTE_UNSIGNED},
+    {0b11100101, "in", "%s ax, %d\n", IT_SINGLEBYTE_UNSIGNED},
+    
+    {0b11101110, "out", "%s dx, al\n", IT_BARE},
+    {0b11101111, "out", "%s dx, ax\n", IT_BARE},
+    {0b11100110, "out", "%s %d, al\n", IT_SINGLEBYTE_UNSIGNED},
+    {0b11100111, "out", "%s %d, ax\n", IT_SINGLEBYTE_UNSIGNED},
+
+    {0b10100000, "mov", "%s ax, [%d]\n", IT_EXTRABYTE_POSSIBLE_WIDE},
+    {0b10100001, "mov", "%s ax, [%d]\n", IT_EXTRABYTE_POSSIBLE_WIDE},
+    
+    {0b10100010, "mov", "%s [%d], ax\n", IT_EXTRABYTE_POSSIBLE_WIDE},
+    {0b10100011, "mov", "%s [%d], ax\n", IT_EXTRABYTE_POSSIBLE_WIDE},
 };
 
 // instruction pointer
@@ -288,7 +320,7 @@ int main(int argc, char **argv)
 
          u8 opp = (secondbyte & 0b00111000) >> 3;
          char *operation = arithmatic_opperations[opp];
-         
+
          char *memaddr = rmtable[rm];
          signed short disp = 0;
          if (mod == 0b10 || mod == 0b01)
@@ -344,30 +376,6 @@ int main(int argc, char **argv)
          {
             printf("%s %s [%s%s], %d\n", operation, sizeprefix, memaddr, displacement, data);
          }
-      }
-      else if ((firstbyte & 0b11111110) == 0b10100000) // mem to accum
-      {
-         short memaddr = read_byte();
-
-         if (iswide)
-         {
-            short secondpart = read_byte();
-
-            memaddr += (secondpart << 8);
-         }
-         printf("mov ax, [%d]\n", memaddr);
-      }
-      else if ((firstbyte & 0b11111110) == 0b10100010) // accum to mem
-      {
-         short memaddr = read_byte();
-
-         if (iswide)
-         {
-            short secondpart = read_byte();
-
-            memaddr += (secondpart << 8);
-         }
-         printf("mov [%d], ax\n", memaddr);
       }
       else if (((firstbyte & 0b11111110) == 0b00000100)     // add immediate to accum
                || ((firstbyte & 0b11111110) == 0b00010100)  // adc
@@ -567,32 +575,6 @@ int main(int argc, char **argv)
             }
          }
       }
-      else if ((firstbyte & 0b11111100) == 0b11100100) // in_out data-8
-      {
-         char *reg = iswide ? "ax" : "al";
-         u8 data = read_byte();
-
-         if (firstbyte & 0b00000010)
-         {
-            printf("out %d, %s\n", data, reg);
-         }
-         else
-         {
-            printf("in %s, %d\n", reg, data);
-         }
-      }
-      else if ((firstbyte & 0b11111100) == 0b11101100) // in_out nodata
-      {
-         char *reg = iswide ? "ax" : "al";
-         if (firstbyte & 0b00000010)
-         {
-            printf("out dx, %s\n", reg);
-         }
-         else
-         {
-            printf("in %s, dx\n", reg);
-         }
-      }
       else if ((firstbyte == 0b10001101) // lea, lds, les
                || (firstbyte == 0b11000101) || (firstbyte == 0b11000100))
       {
@@ -618,22 +600,14 @@ int main(int argc, char **argv)
             printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
          }
       }
-      else if (firstbyte == 0b11010100)
-      {
-         u8 xtra = read_byte();
-         printf("aam\n");
-      }
-      else if (firstbyte == 0b11010101)
-      {
-         u8 xtra = read_byte();
-         printf("aad\n");
-      }
-      else if ((firstbyte & 0b11111100) == 0b00100000) // AND r/m with reg
+      else if ((firstbyte & 0b11111100) == 0b00100000) // AND r/m with reg)
       {
          u8 secondbyte = read_byte();
          u8 mod = (secondbyte & 0b11000000) >> 6;
          u8 reg = (secondbyte & 0b00111000) >> 3;
          u8 rm = secondbyte & 0b111;
+
+         char *opp = "and";
 
          char **memaddr = iswide ? wordregisters : byteregisters;
          if (mod == 0b11)
@@ -646,7 +620,7 @@ int main(int argc, char **argv)
                dst = src;
                src = t;
             }
-            printf("and %s, %s\n", dst, src);
+            printf("%s %s, %s\n", opp, dst, src);
          }
          else
          {
@@ -657,26 +631,26 @@ int main(int argc, char **argv)
             {
                rr = "";
             }
-            if (sw_dw & 0b10) // if the D bit is set swap dst and src;
+            // if (sw_dw & 0b10) // if the D bit is set swap dst and src;
             {
-               printf("and %s, [%s%s]\n", memaddr[reg], rr, displacement);
+               printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
             }
-            else
-            {
-               printf("and [%s%s], %s\n", rr, displacement, memaddr[reg]);
-            }
+            // else
+            // {
+            //    printf("%s [%s%s], %s\n", opp, rr, displacement, memaddr[reg]);
+            // }
          }
       }
       else if ((firstbyte & 0b11111110) == 0b00100100) // AND immediate to accumulator
       {
-         short datalow = read_byte();
+         short data = read_byte();
          if (iswide)
          {
             u8 datahigh = read_byte();
-            datalow += (datahigh << 8);
+            data += (datahigh << 8);
          }
          char *dst = iswide ? "ax" : "al";
-         printf("and %s, %d\n", dst, datalow);
+         printf("and %s, %d\n", dst, data);
       }
       else
       {
@@ -687,18 +661,41 @@ int main(int argc, char **argv)
             SimpleInstruction instr = jumps[i];
             if (instr.pattern == firstbyte)
             {
-               if (instr.readbyte)
+               if (instr.type == IT_BARE)
+               {
+                  printf(instr.printformat, instr.instruction);
+                  handled = 1;
+                  break;
+               }
+               else if (instr.type == IT_SINGLEBYTE)
                {
                   signed char data = read_byte();
                   printf(instr.printformat, instr.instruction, data);
                   handled = 1;
                   break;
                }
-               else
+               else if (instr.type == IT_SINGLEBYTE_UNSIGNED)
                {
-                  printf(instr.printformat, instr.instruction);
+                  u8 data = read_byte();
+                  printf(instr.printformat, instr.instruction, data);
                   handled = 1;
                   break;
+               }
+               else if (instr.type == IT_EXTRABYTE_POSSIBLE_WIDE)
+               {
+                  short data = read_byte();
+                  if (iswide)
+                  {
+                     short secondpart = read_byte();
+                     data += (secondpart << 8);
+                  }
+                  printf(instr.printformat, instr.instruction, data);
+                  handled = 1;
+                  break;
+               }
+               else
+               {
+                  printf("ERROR: UNKNONW INstruction Type %x", instr.type);
                }
             }
          }
@@ -706,6 +703,7 @@ int main(int argc, char **argv)
          if (!handled)
          {
             printf("; UNKNOWN OPCODE %x\n", firstbyte);
+            free(content);
             exit(1);
          }
       }
