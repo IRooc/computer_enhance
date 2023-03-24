@@ -288,24 +288,7 @@ int main(int argc, char **argv)
 
          u8 opp = (secondbyte & 0b00111000) >> 3;
          char *operation = arithmatic_opperations[opp];
-
-         u8 oper = (secondbyte & 0b00111000) >> 3;
-         if (oper == 0b101)
-         {
-            operation = "sub";
-         }
-         else if (oper == 0b111)
-         {
-            operation = "cmp";
-         }
-         else if (oper == 0b010)
-         {
-            operation = "adc";
-         }
-         else if (oper == 0b011)
-         {
-            operation = "sbb";
-         }
+         
          char *memaddr = rmtable[rm];
          signed short disp = 0;
          if (mod == 0b10 || mod == 0b01)
@@ -336,7 +319,7 @@ int main(int argc, char **argv)
 
          short data = read_byte();
 
-         if (sw_dw == 0b01) // extra byte?
+         if (sw_dw == 0b01) // extra byte if sw is 01 only
          {
             short data2 = read_byte();
 
@@ -464,42 +447,14 @@ int main(int argc, char **argv)
          else
          {
             char *sizeprefix = iswide ? "word" : "byte";
-            signed short disp = 0;
-            if (mod != 0 || (mod == 0 && rm == 0b110))
-            {
-               u8 disphigh = 0;
-               u8 displow = read_byte();
-
-               if (mod == 0b10 || (mod == 0 && rm == 0b110)) // it's 16bit displacement
-               {
-                  disphigh = read_byte();
-
-                  disp = (signed short)((disphigh << 8) + displow);
-               }
-               else
-               {
-                  disp = (signed char)displow;
-               }
-            }
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
             if (mod == 0 && rm == 0b110)
             {
                printf("%s %s [%d]\n", "pop", sizeprefix, disp);
             }
             else
             {
-               char displacement[32] = "";
-               if (disp && mod) // write displacement suffix
-               {
-                  if (disp < 0)
-                  {
-                     disp *= -1;
-                     snprintf(displacement, 32, " - %d", disp);
-                  }
-                  else
-                  {
-                     snprintf(displacement, 32, " + %d", disp);
-                  }
-               }
                char *memaddr = rmtable[rm];
                printf("%s %s [%s%s]\n", "pop", sizeprefix, memaddr, displacement);
             }
@@ -712,7 +667,7 @@ int main(int argc, char **argv)
             }
          }
       }
-      else if ((firstbyte & 0b11111100) == 0b00100100) // AND immediate to accumulator
+      else if ((firstbyte & 0b11111110) == 0b00100100) // AND immediate to accumulator
       {
          short datalow = read_byte();
          if (iswide)
