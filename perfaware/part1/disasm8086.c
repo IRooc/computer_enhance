@@ -22,7 +22,7 @@ typedef struct
 } SimpleInstruction;
 
 SimpleInstruction jumps[] = {
-    {0b00011111, "pop ds","pop ds\n", 0},
+    {0b00011111, "pop ds", "pop ds\n", 0},
     {0b00001110, "push cs", "push cs\n", 0},
     {0b11010111, "xlat", "xlat\n", 0},
     {0b10011111, "lahf", "lahf\n", 0},
@@ -71,10 +71,10 @@ u8 read_byte()
 }
 // used only on single instances
 char displacement[32] = "";
-char *read_displacement(u8 mod, u8 rm)
+char *read_displacement(u8 mod, u8 rm, signed short *disp)
 {
    sprintf(displacement, "");
-   signed short disp = 0;
+   *disp = 0;
    if (mod != 0 || (mod == 0 && rm == 0b110))
    {
       u8 disphigh = 0;
@@ -84,21 +84,21 @@ char *read_displacement(u8 mod, u8 rm)
       {
          disphigh = read_byte();
 
-         disp = (signed short)((disphigh << 8) + displow);
+         *disp = (signed short)((disphigh << 8) + displow);
       }
       else
       {
-         disp = (signed char)displow;
+         *disp = (signed char)displow;
       }
-      if (disp)
+      if (*disp)
       {
-         if (disp < 0)
+         if (*disp < 0)
          {
-            snprintf(displacement, 32, " - %d", disp * -1);
+            snprintf(displacement, 32, " - %d", *disp * -1);
          }
          else
          {
-            snprintf(displacement, 32, " + %d", disp);
+            snprintf(displacement, 32, " + %d", *disp);
          }
       }
    }
@@ -188,11 +188,7 @@ int main(int argc, char **argv)
          u8 reg = (secondbyte & 0x38) >> 3;
          u8 rm = secondbyte & 0x7;
 
-         char **regnames = byteregisters;
-         if (iswide)
-         {
-            regnames = wordregisters;
-         }
+         char **regnames = iswide ? wordregisters : byteregisters;
 
          if (mod == 0b11) // register to register
          {
@@ -602,7 +598,8 @@ int main(int argc, char **argv)
          }
          else
          {
-            char *displacement = read_displacement(mod, rm);
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
             char *rr = rmtable[rm];
             printf("xchg %s, [%s%s];TODO check order\n", memaddr[reg], rr, displacement);
          }
@@ -627,7 +624,8 @@ int main(int argc, char **argv)
          }
          else
          {
-            char *displacement = read_displacement(mod, rm);
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
             char *sizeprefix = iswide ? "word" : "byte";
             char *rr = rmtable[rm];
             printf("%s %s [%s%s], %s\n", opp[reg], sizeprefix, rr, displacement, source[v]);
@@ -675,7 +673,8 @@ int main(int argc, char **argv)
             }
             else
             {
-               char *displacement = read_displacement(mod, rm);
+               signed short disp;
+               char *displacement = read_displacement(mod, rm, &disp);
                char *rr = rmtable[rm];
                printf("%s %s [%s%s]\n", opp, sizeprefix, rr, displacement);
             }
@@ -726,7 +725,8 @@ int main(int argc, char **argv)
          }
          else
          {
-            char *displacement = read_displacement(mod, rm);
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
             char *rr = rmtable[rm];
             printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
          }
@@ -740,6 +740,57 @@ int main(int argc, char **argv)
       {
          u8 xtra = read_byte();
          printf("aad\n");
+      }
+      else if ((firstbyte & 0b11111100) == 0b00100000) // AND r/m with reg
+      {
+         u8 secondbyte = read_byte();
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 reg = (secondbyte & 0b00111000) >> 3;
+         u8 rm = secondbyte & 0b111;
+
+         char **memaddr = iswide ? wordregisters : byteregisters;
+         if (mod == 0b11)
+         {
+            char *dst = memaddr[rm];
+            char *src = memaddr[reg];
+            if (sw_dw & 0b10) // if the D bit is set swap dst and src;
+            {
+               char *t = dst;
+               dst = src;
+               src = t;
+            }
+            printf("and %s, %s\n", dst, src);
+         }
+         else
+         {
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
+            char *rr = rmtable[rm];
+            if (mod == 0 && rm == 0b110)
+            {
+               rr = "";
+               sprintf(displacement,"%d", disp);
+            }
+            if (sw_dw & 0b10) // if the D bit is set swap dst and src;
+            {
+               printf("and %s, [%s%s]\n", memaddr[reg], rr, displacement);
+            }
+            else
+            {
+               printf("and [%s%s], %s\n", rr, displacement, memaddr[reg]);
+            }
+         }
+      }
+      else if ((firstbyte & 0b11111100) == 0b00100100) // AND immediate to accumulator
+      {
+         short datalow = read_byte();
+         if (iswide)
+         {
+            u8 datahigh = read_byte();
+            datalow += (datahigh << 8);
+         }
+         char *dst = iswide ? "ax" : "al";
+         printf("and %s, %d\n", dst, datalow);
       }
       else
       {
