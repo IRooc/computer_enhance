@@ -2,9 +2,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 typedef uint8_t u8;
 typedef u8 bool;
+
+
+#include "disasm8086_simulator.c"
 
 static char *byteregisters[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
 static char *wordregisters[] = {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"};
@@ -18,8 +22,7 @@ typedef enum
    IT_BARE,
    IT_SINGLEBYTE,
    IT_SINGLEBYTE_UNSIGNED,
-   IT_EXTRABYTE_POSSIBLE_WIDE,
-   IT_MOD_RM_REG
+   IT_EXTRABYTE_POSSIBLE_WIDE
 } InstructionType;
 
 typedef struct
@@ -90,15 +93,13 @@ SimpleInstruction jumps[] = {
     {0b10100011, "mov", "%s [%d], ax\n", IT_EXTRABYTE_POSSIBLE_WIDE},
 };
 
-// instruction pointer
-int ip = 0;
 // bytestream
 u8 *content;
 
 u8 read_byte()
 {
-   u8 result = content[ip];
-   ip += 1;
+   u8 result = content[TheMachine.ip];
+   TheMachine.ip += 1;
    return result;
 }
 // used only on single instances
@@ -192,10 +193,11 @@ int main(int argc, char **argv)
    // asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
 
+
    // start the asm output, assume 16 bits so 2 byte jumps
-   while (ip < filesize)
+   while (TheMachine.ip < filesize)
    {
-      if (ip + 1 >= filesize)
+      if (TheMachine.ip + 1 >= filesize)
       {
          printf("Only one byte left at the end of the file, stopping early");
          break;
@@ -239,6 +241,7 @@ int main(int argc, char **argv)
                src = rm;
             }
             printf("%s %s, %s\n", operation, regnames[dst], regnames[src]);
+            machine_move(regnames[dst], regnames[src]);
          }
          else // mem to reg or reg to mem
          {
@@ -276,6 +279,7 @@ int main(int argc, char **argv)
 
             datalow += (datahigh << 8);
             printf("mov %s, %d\n", regnames[reg2], (signed short)datalow);
+            machine_move_immediate(regnames[reg2], datalow);
          }
          else
          {
@@ -309,9 +313,7 @@ int main(int argc, char **argv)
             printf("mov [%s], %s %d\n", memaddr, sizeprefix, data);
          }
       }
-      else if (((firstbyte & 0b111111100) == 0b10000000)     // add immediate to reg/mem
-               || ((firstbyte & 0b111111100) == 0b10000000)  // adc
-               || ((firstbyte & 0b111111100) == 0b10000000)) // sub cmp
+      else if ((firstbyte & 0b111111100) == 0b10000000)     // add immediate to reg/mem {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
       {
          u8 secondbyte = read_byte();
 
@@ -325,7 +327,7 @@ int main(int argc, char **argv)
          signed short disp = 0;
          if (mod == 0b10 || mod == 0b01)
          {
-            u8 displow = read_byte();
+            signed short displow = read_byte();
 
             u8 disphigh = 0;
             if (mod == 0b10)
@@ -631,14 +633,14 @@ int main(int argc, char **argv)
             {
                rr = "";
             }
-            // if (sw_dw & 0b10) // if the D bit is set swap dst and src;
+            if (sw_dw & 0b10) // if the D bit is set swap dst and src;
             {
                printf("%s %s, [%s%s]\n", opp, memaddr[reg], rr, displacement);
             }
-            // else
-            // {
-            //    printf("%s [%s%s], %s\n", opp, rr, displacement, memaddr[reg]);
-            // }
+            else
+            {
+               printf("%s [%s%s], %s\n", opp, rr, displacement, memaddr[reg]);
+            }
          }
       }
       else if ((firstbyte & 0b11111110) == 0b00100100) // AND immediate to accumulator
@@ -708,6 +710,7 @@ int main(int argc, char **argv)
          }
       }
    }
+   machine_print();
    free(content);
    exit(0);
 }
