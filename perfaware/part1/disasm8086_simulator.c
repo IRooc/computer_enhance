@@ -132,4 +132,6 @@ void machine_print()
    printf("\tbp: 0x%04x\n", TheMachine.bp);
    printf("\tsi: 0x%04x\n", TheMachine.si);
    printf("\tdi: 0x%04x\n\n", TheMachine.di);
+   printf("\tes: 0x%04x\tss: 0x%04x\tds: 0x%04x\tcs: 0x%04x\n", TheMachine.es, TheMachine.ss, TheMachine.ds, TheMachine.cs);
+   printf("\tip: 0x%04x\n\n", TheMachine.ip);
 }
