@@ -2,11 +2,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 typedef uint8_t u8;
 typedef u8 bool;
-
 
 #include "disasm8086_simulator.c"
 
@@ -72,15 +70,15 @@ SimpleInstruction jumps[] = {
     {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
     {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
     {0b11100011, "jcxz", "%s $+2%+d\n", IT_SINGLEBYTE},
-    
-    {0b11010100, "aam", "%s\n", IT_SINGLEBYTE}, //extra byte is ignored
-    {0b11010101, "aad", "%s\n", IT_SINGLEBYTE}, //extra byte is ignored
+
+    {0b11010100, "aam", "%s\n", IT_SINGLEBYTE}, // extra byte is ignored
+    {0b11010101, "aad", "%s\n", IT_SINGLEBYTE}, // extra byte is ignored
 
     {0b11101100, "in", "%s al, dx\n", IT_BARE},
     {0b11101101, "in", "%s ax, dx\n", IT_BARE},
     {0b11100100, "in", "%s al, %d\n", IT_SINGLEBYTE_UNSIGNED},
     {0b11100101, "in", "%s ax, %d\n", IT_SINGLEBYTE_UNSIGNED},
-    
+
     {0b11101110, "out", "%s dx, al\n", IT_BARE},
     {0b11101111, "out", "%s dx, ax\n", IT_BARE},
     {0b11100110, "out", "%s %d, al\n", IT_SINGLEBYTE_UNSIGNED},
@@ -88,7 +86,7 @@ SimpleInstruction jumps[] = {
 
     {0b10100000, "mov", "%s ax, [%d]\n", IT_EXTRABYTE_POSSIBLE_WIDE},
     {0b10100001, "mov", "%s ax, [%d]\n", IT_EXTRABYTE_POSSIBLE_WIDE},
-    
+
     {0b10100010, "mov", "%s [%d], ax\n", IT_EXTRABYTE_POSSIBLE_WIDE},
     {0b10100011, "mov", "%s [%d], ax\n", IT_EXTRABYTE_POSSIBLE_WIDE},
 };
@@ -193,7 +191,6 @@ int main(int argc, char **argv)
    // asm header
    printf("; output from file %s\n\nbits 16\n\n", filename);
 
-
    // start the asm output, assume 16 bits so 2 byte jumps
    while (TheMachine.ip < filesize)
    {
@@ -202,7 +199,8 @@ int main(int argc, char **argv)
          printf("Only one byte left at the end of the file, stopping early");
          break;
       }
-      // decode the 16 bit instruction
+      machine_print();
+      //  decode the 16 bit instruction
       u8 firstbyte = read_byte();
 
       u8 sw_dw = (firstbyte & 0b11); // wide?
@@ -279,12 +277,12 @@ int main(int argc, char **argv)
 
             datalow += (datahigh << 8);
             printf("mov %s, %d\n", regnames[reg2], (signed short)datalow);
-            machine_move_immediate(regnames[reg2], datalow);
          }
          else
          {
             printf("mov %s, %d\n", regnames[reg2], (signed char)datalow);
          }
+         machine_move_immediate(regnames[reg2], datalow);
       }
       else if ((firstbyte & 0b11111110) == 0b11000110) // MOV immediate to reg/mem
       {
@@ -313,7 +311,7 @@ int main(int argc, char **argv)
             printf("mov [%s], %s %d\n", memaddr, sizeprefix, data);
          }
       }
-      else if ((firstbyte & 0b111111100) == 0b10000000)     // add immediate to reg/mem {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
+      else if ((firstbyte & 0b111111100) == 0b10000000) // add immediate to reg/mem {"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"};
       {
          u8 secondbyte = read_byte();
 
@@ -401,6 +399,43 @@ int main(int argc, char **argv)
          {
             signed short imm = (signed short)(char)memaddr;
             printf("%s al, %d\n", operation, imm);
+         }
+      }
+      else if (firstbyte == 0b10001110 || firstbyte == 0b10001100) // SEGREG from reg/mem
+      {
+
+         u8 secondbyte = read_byte();
+         u8 mod = (secondbyte & 0b11000000) >> 6;
+         u8 sr = (secondbyte & 0b00011000) >> 3;
+         u8 rm = secondbyte & 0b111;
+         char *segregs[8] = {"es", "cs", "ss", "ds"};
+         if (mod == 0b11)
+         {
+            char *src = segregs[sr];
+            char *dst = wordregisters[rm];
+            if (sw_dw & 0b10)
+            {
+               char *tmp = src;
+               src = dst;
+               dst = tmp;
+            }
+            printf("mov %s, %s\n", dst, src);
+            machine_move(dst, src);
+         }
+         else
+         {
+            // todo check this
+            signed short disp;
+            char *displacement = read_displacement(mod, rm, &disp);
+            if (mod == 0 && rm == 0b110)
+            {
+               printf("mov %s, [%d]\n", segregs[sr], disp);
+            }
+            else
+            {
+               char *memaddr = rmtable[rm];
+               printf("mov %s [%s%s]\n", segregs[sr], memaddr, displacement);
+            }
          }
       }
       else if (firstbyte == 0b11111111) // push
