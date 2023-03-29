@@ -427,14 +427,22 @@ int main(int argc, char **argv)
             // todo check this
             signed short disp;
             char *displacement = read_displacement(mod, rm, &disp);
-            if (mod == 0 && rm == 0b110)
+            if (mod == 0 && rm == 0b110) // can it be reversed?
             {
                printf("mov %s, [%d]\n", segregs[sr], disp);
             }
             else
             {
-               char *memaddr = rmtable[rm];
-               printf("mov %s [%s%s]\n", segregs[sr], memaddr, displacement);
+               char *src = rmtable[rm];
+               char *dst = segregs[sr];
+               if (sw_dw & 0b10)
+               {
+                  printf("mov [%s%s] %s \n", src, displacement, dst);
+               }
+               else
+               {
+                  printf("mov %s [%s%s]\n", dst, src, displacement);
+               }
             }
          }
       }
