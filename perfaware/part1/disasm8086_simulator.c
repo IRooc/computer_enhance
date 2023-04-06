@@ -198,6 +198,21 @@ void machine_arithmatic_data(char *operation, char *dest, short data)
    }
 }
 
+void machine_simpleinstruction_signed_data(char *operation, signed short data)
+{
+   if (strcmp(operation, "jnz") == 0)
+   {
+      if (TheMachine.flags.zf == 0)
+      {
+         TheMachine.ip += data;
+      }
+   }
+   else
+   {
+      printf("ERROR: unknown operation on data %s", operation);
+   }
+}
+
 void machine_print()
 {
    printf("\nRegisters:\n");

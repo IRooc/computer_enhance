@@ -717,6 +717,7 @@ int main(int argc, char **argv)
                {
                   signed char data = read_byte();
                   printf(instr.printformat, instr.instruction, data);
+                  machine_simpleinstruction_signed_data(instr.instruction, data);
                   handled = 1;
                   break;
                }
