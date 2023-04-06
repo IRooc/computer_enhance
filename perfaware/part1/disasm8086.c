@@ -31,7 +31,7 @@ typedef struct
    InstructionType type;
 } SimpleInstruction;
 
-SimpleInstruction jumps[] = {
+SimpleInstruction simpletons[] = {
     // single byte instructutions
     {0b00011111, "pop ds", "pop ds\n", IT_BARE},
     {0b00001110, "push cs", "push cs\n", IT_BARE},
@@ -239,7 +239,7 @@ int main(int argc, char **argv)
                src = rm;
             }
             printf("%s %s, %s\n", operation, regnames[dst], regnames[src]);
-            machine_move(regnames[dst], regnames[src]);
+            machine_arithmatic(operation, regnames[dst], regnames[src]);
          }
          else // mem to reg or reg to mem
          {
@@ -371,6 +371,7 @@ int main(int argc, char **argv)
          {
             memaddr = iswide ? wordregisters[rm] : byteregisters[rm];
             printf("%s %s, %d\n", operation, memaddr, data);
+            machine_arithmatic_data(operation, memaddr, data);
          }
          else
          {
@@ -420,7 +421,7 @@ int main(int argc, char **argv)
                dst = tmp;
             }
             printf("mov %s, %s\n", dst, src);
-            machine_move(dst, src);
+            machine_arithmatic("mov", dst, src);
          }
          else
          {
@@ -701,9 +702,9 @@ int main(int argc, char **argv)
       {
          u8 handled = 0;
          // simple instructions
-         for (int i = 0; i < ArrayCount(jumps); i++)
+         for (int i = 0; i < ArrayCount(simpletons); i++)
          {
-            SimpleInstruction instr = jumps[i];
+            SimpleInstruction instr = simpletons[i];
             if (instr.pattern == firstbyte)
             {
                if (instr.type == IT_BARE)
